@@ -36,7 +36,9 @@ export class CreateReminderModal extends Modal {
     new Setting(contentEl)
       .setName("Title")
       .addText((text) =>
-        text.setValue(this.title).setDisabled(true)
+        text
+          .setValue(this.title)
+          .onChange((value) => { this.title = value; })
       );
 
     const listSetting = new Setting(contentEl).setName("Reminder list");
@@ -63,6 +65,11 @@ export class CreateReminderModal extends Modal {
         .setCta()
         .onClick(() => this.submit())
     );
+
+    this.scope.register([], "Enter", (e) => {
+      e.preventDefault();
+      this.submit();
+    });
   }
 
   private async loadLists(
