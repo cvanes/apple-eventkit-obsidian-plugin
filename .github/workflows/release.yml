@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Build eventkitcli
+        run: |
+          cd eventkitcli
+          swift build -c release --arch arm64
+          swift build -c release --arch x86_64
+          lipo -create \
+            .build/arm64-apple-macosx/release/eventkitcli \
+            .build/x86_64-apple-macosx/release/eventkitcli \
+            -output eventkitcli-universal
+          codesign --force --sign - --entitlements eventkitcli.entitlements eventkitcli-universal
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          gh release create "$tag" \
+            --title "$tag" \
+            --generate-notes \
+            main.js \
+            manifest.json \
+            styles.css \
+            eventkitcli/eventkitcli-universal

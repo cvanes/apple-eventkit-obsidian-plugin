@@ -1,0 +1,18 @@
+# Build output
+main.js
+eventkitcli/eventkitcli
+
+# npm
+node_modules
+
+# Swift build
+eventkitcli/.build/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+
+# Obsidian
+data.json

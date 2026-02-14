@@ -1,0 +1,134 @@
+/* Header */
+.apple-eventkit-header {
+  padding: var(--size-4-2) var(--size-4-3);
+}
+
+.apple-eventkit-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--size-4-2);
+}
+
+.apple-eventkit-nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-ui-medium);
+  padding: var(--size-4-1) var(--size-4-2);
+  border-radius: var(--radius-s);
+}
+
+.apple-eventkit-nav-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.apple-eventkit-date-label {
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-medium);
+  cursor: pointer;
+}
+
+.apple-eventkit-date-label:hover {
+  color: var(--text-accent);
+}
+
+.apple-eventkit-actions {
+  display: flex;
+  gap: var(--size-4-2);
+  justify-content: center;
+}
+
+.apple-eventkit-btn {
+  background: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-2-1) var(--size-4-2);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.apple-eventkit-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.apple-eventkit-date-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+/* Event list */
+.apple-eventkit-events {
+  padding: 0 var(--size-4-3);
+}
+
+.apple-eventkit-event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--size-4-2);
+  padding: var(--size-4-2);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.apple-eventkit-event-row:hover {
+  background-color: var(--nav-item-background-hover);
+}
+
+.apple-eventkit-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  display: inline-block;
+}
+
+.apple-eventkit-event-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.apple-eventkit-event-time {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.apple-eventkit-event-title {
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.apple-eventkit-linked {
+  color: var(--text-accent);
+}
+
+.apple-eventkit-linked:hover {
+  text-decoration: underline;
+}
+
+/* States */
+.apple-eventkit-empty,
+.apple-eventkit-loading,
+.apple-eventkit-error {
+  padding: var(--size-4-4) var(--size-4-3);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  text-align: center;
+}
+
+.apple-eventkit-error {
+  color: var(--text-error);
+}
