@@ -52,18 +52,6 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName("Template file")
-      .setDesc("Path to a template note in your vault (optional).")
-      .addText((text) =>
-        text
-          .setPlaceholder("e.g. Templates/Event.md")
-          .setValue(this.plugin.settings.templateFilePath)
-          .onChange(async (value) => {
-            this.plugin.settings.templateFilePath = value;
-            await this.plugin.saveSettings();
-          })
-      );
   }
 
   private addReminderSettings(containerEl: HTMLElement): void {

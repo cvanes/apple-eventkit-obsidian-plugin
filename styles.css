@@ -119,6 +119,11 @@
   text-decoration: underline;
 }
 
+/* Past events */
+.apple-eventkit-past {
+  opacity: 0.45;
+}
+
 /* States */
 .apple-eventkit-empty,
 .apple-eventkit-loading,

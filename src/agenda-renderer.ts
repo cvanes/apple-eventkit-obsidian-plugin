@@ -67,13 +67,20 @@ export function renderEventList(
   }
 }
 
+function isPastEvent(event: BridgeEvent): boolean {
+  return new Date(event.endDate) < new Date();
+}
+
 function renderEventRow(
   container: HTMLElement,
   event: BridgeEvent,
   hasNote: boolean,
   callbacks: AgendaCallbacks
 ): void {
-  const row = container.createDiv({ cls: "apple-eventkit-event-row" });
+  const cls = isPastEvent(event)
+    ? "apple-eventkit-event-row apple-eventkit-past"
+    : "apple-eventkit-event-row";
+  const row = container.createDiv({ cls });
   row.addEventListener("click", () => callbacks.onEventClick(event));
 
   const dot = row.createEl("span", { cls: "apple-eventkit-dot" });

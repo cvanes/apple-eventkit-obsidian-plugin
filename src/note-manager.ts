@@ -1,19 +1,6 @@
 import { App, TFile, normalizePath } from "obsidian";
 import { BridgeEvent, PluginSettings } from "./types";
-import { formatNoteDate, expandDateTokens, formatTime } from "./date-utils";
-
-const DEFAULT_TEMPLATE = `# {{title}}
-
-| | |
-|---|---|
-| **Date** | {{date}} |
-| **Time** | {{startTime}} - {{endTime}} |
-| **Calendar** | {{calendar}} |
-| **Location** | {{location}} |
-
-## Meeting Notes
-
-`;
+import { formatNoteDate, expandDateTokens } from "./date-utils";
 
 export function findNoteForEvent(app: App, eventId: string): TFile | null {
   for (const file of app.vault.getMarkdownFiles()) {
@@ -53,9 +40,8 @@ async function createEventNote(
     ? normalizePath(`${folderPath}/${filename}`)
     : normalizePath(filename);
 
-  const frontmatter = buildFrontmatter(event, eventDate);
-  const body = await buildBody(app, event, settings, eventDate);
-  const content = `---\n${frontmatter}---\n\n${body}`;
+  const frontmatter = buildFrontmatter(event);
+  const content = `---\n${frontmatter}---\n`;
 
   return app.vault.create(fullPath, content);
 }
@@ -72,68 +58,15 @@ async function ensureFolder(app: App, folderPath: string): Promise<void> {
   await app.vault.createFolder(normalized);
 }
 
-function buildFrontmatter(event: BridgeEvent, eventDate: Date): string {
+function buildFrontmatter(event: BridgeEvent): string {
+  const timestamp = Math.floor(new Date(event.startDate).getTime() / 1000);
   const lines = [
     `event-id: "${event.id}"`,
-    `event-title: "${escape(event.title)}"`,
-    `calendar: "${escape(event.calendarTitle)}"`,
-    `event-date: "${formatNoteDate(eventDate, "YYYY-MM-DD")}"`,
-    `start-time: "${formatTime(event.startDate)}"`,
-    `end-time: "${formatTime(event.endDate)}"`,
+    `event-link: "calshow:${timestamp}"`,
   ];
-  if (event.location) {
-    lines.push(`location: "${escape(event.location)}"`);
-  }
   return lines.join("\n") + "\n";
-}
-
-async function buildBody(
-  app: App,
-  event: BridgeEvent,
-  settings: PluginSettings,
-  eventDate: Date
-): Promise<string> {
-  const templateContent = await loadTemplate(app, settings.templateFilePath);
-  const template = templateContent ?? DEFAULT_TEMPLATE;
-  return expandTemplateVars(template, event, eventDate, settings);
-}
-
-async function loadTemplate(
-  app: App,
-  path: string
-): Promise<string | null> {
-  if (!path) return null;
-  const file = app.vault.getAbstractFileByPath(normalizePath(path));
-  if (!(file instanceof TFile)) return null;
-  return app.vault.read(file);
-}
-
-function expandTemplateVars(
-  template: string,
-  event: BridgeEvent,
-  eventDate: Date,
-  settings: PluginSettings
-): string {
-  const vars: Record<string, string> = {
-    title: event.title,
-    date: formatNoteDate(eventDate, settings.dateFormat),
-    startTime: formatTime(event.startDate),
-    endTime: formatTime(event.endDate),
-    calendar: event.calendarTitle,
-    location: event.location || "",
-    notes: event.notes || "",
-  };
-  let result = template;
-  for (const [key, value] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`{{${key}}}`, "g"), value);
-  }
-  return result;
 }
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, "-");
-}
-
-function escape(str: string): string {
-  return str.replace(/"/g, '\\"');
 }

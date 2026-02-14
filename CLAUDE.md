@@ -6,13 +6,13 @@ Obsidian plugin that integrates with Apple Calendar and Reminders on macOS via a
 
 The plugin has two parts:
 
-1. **`eventkitcli`** — A standalone Swift CLI tool that wraps Apple's EventKit framework. Installed to `~/.local/bin/eventkitcli`. All commands output JSON to stdout.
+1. **`eventkitcli`** — A standalone Swift CLI tool that wraps Apple's EventKit framework. Bundled alongside the plugin in its directory. All commands output JSON to stdout.
 2. **`src/`** — The Obsidian plugin (TypeScript). Calls `eventkitcli` via `child_process.execFile` through a bridge layer (`bridge.ts`).
 
 ## Building
 
 - **Plugin**: `npm run build` produces `main.js` in the project root.
-- **CLI**: `cd eventkitcli && bash build.sh` builds a universal binary (arm64 + x86_64), codesigns it, and installs to `~/.local/bin/eventkitcli`.
+- **CLI**: `cd eventkitcli && bash build.sh` builds a universal binary (arm64 + x86_64), codesigns it, and copies it to the plugin directory.
 
 ## Key conventions
 
@@ -32,4 +32,4 @@ eventkitcli --help
 
 ## Testing the plugin
 
-Copy the built plugin files (`main.js`, `manifest.json`, `styles.css`) into a vault's `.obsidian/plugins/apple-eventkit/` directory and enable it in Obsidian settings.
+Copy the built plugin files (`main.js`, `manifest.json`, `styles.css`, `eventkitcli`) into a vault's `.obsidian/plugins/apple-eventkit/` directory and enable it in Obsidian settings.

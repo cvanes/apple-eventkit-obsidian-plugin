@@ -8,7 +8,6 @@ export interface CalendarToggle {
 export interface PluginSettings {
   dateFormat: string;
   noteFolderPath: string;
-  templateFilePath: string;
   defaultReminderList: string;
   calendarToggles: CalendarToggle[];
   bridgePath: string;
@@ -17,7 +16,6 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
   dateFormat: "YYYY-MM-DD",
   noteFolderPath: "",
-  templateFilePath: "",
   defaultReminderList: "",
   calendarToggles: [],
   bridgePath: "",
