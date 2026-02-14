@@ -114,7 +114,14 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
       return;
     }
 
-    const grouped = this.groupBySource(toggles);
+    const needsRefresh = toggles.some((t) => !t.source);
+    if (needsRefresh) {
+      this.refreshCalendars().then(() => this.display());
+      return;
+    }
+
+    const grouped = [...this.groupBySource(toggles).entries()]
+      .sort(([a], [b]) => a.localeCompare(b));
     for (const [source, items] of grouped) {
       new Setting(containerEl).setName(source).setHeading();
       for (const toggle of items) {
@@ -130,6 +137,9 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
       const list = groups.get(source) ?? [];
       list.push(toggle);
       groups.set(source, list);
+    }
+    for (const [, items] of groups) {
+      items.sort((a, b) => a.title.localeCompare(b.title));
     }
     return groups;
   }

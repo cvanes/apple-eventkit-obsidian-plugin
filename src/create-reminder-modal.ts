@@ -1,4 +1,5 @@
 import { App, Modal, Notice, Setting } from "obsidian";
+import * as chrono from "chrono-node";
 import { BridgeReminderList, PluginSettings } from "./types";
 import { createReminder, fetchReminderLists } from "./bridge";
 
@@ -9,7 +10,7 @@ export class CreateReminderModal extends Modal {
   onCreated: (reminderId: string, reminderTitle: string) => void;
 
   private selectedListId = "";
-  private dueDate = "";
+  private dueDateInput = "";
   private reminderLists: BridgeReminderList[] = [];
 
   constructor(
@@ -47,12 +48,12 @@ export class CreateReminderModal extends Modal {
 
     new Setting(contentEl)
       .setName("Due date")
-      .setDesc("Optional")
+      .setDesc("e.g. tomorrow, next Monday at 9am, 2026-03-01")
       .addText((text) =>
         text
-          .setPlaceholder("YYYY-MM-DD")
+          .setPlaceholder("Optional")
           .onChange((value) => {
-            this.dueDate = value;
+            this.dueDateInput = value;
           })
       );
 
@@ -91,9 +92,7 @@ export class CreateReminderModal extends Modal {
       return;
     }
     try {
-      const dueIso = this.dueDate
-        ? `${this.dueDate}T09:00:00Z`
-        : undefined;
+      const dueIso = this.parseDueDate();
       const reminder = await createReminder(
         this.bridgePath,
         this.selectedListId,
@@ -106,5 +105,15 @@ export class CreateReminderModal extends Modal {
     } catch (e) {
       new Notice(`Failed to create reminder: ${e}`);
     }
+  }
+
+  private parseDueDate(): string | undefined {
+    if (!this.dueDateInput.trim()) return undefined;
+    const parsed = chrono.parseDate(this.dueDateInput);
+    if (!parsed) {
+      new Notice(`Could not parse date: "${this.dueDateInput}"`);
+      return undefined;
+    }
+    return parsed.toISOString();
   }
 }
