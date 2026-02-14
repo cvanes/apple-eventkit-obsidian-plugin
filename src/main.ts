@@ -135,7 +135,7 @@ export default class AppleCalendarPlugin extends Plugin {
 
   private bundledCliPath(): string {
     const vaultPath = (this.app.vault.adapter as any).getBasePath();
-    const cliPath = join(vaultPath, this.manifest.dir!, "eventkitcli");
+    const cliPath = join(vaultPath, this.manifest.dir!, "eventkitcli-bin");
     this.ensureExecutable(cliPath);
     return cliPath;
   }

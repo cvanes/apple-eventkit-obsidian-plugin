@@ -32,4 +32,4 @@ eventkitcli --help
 
 ## Testing the plugin
 
-Copy the built plugin files (`main.js`, `manifest.json`, `styles.css`, `eventkitcli`) into a vault's `.obsidian/plugins/apple-eventkit/` directory and enable it in Obsidian settings.
+Copy the built plugin files (`main.js`, `manifest.json`, `styles.css`, `eventkitcli-bin`) into a vault's `.obsidian/plugins/apple-eventkit/` directory and enable it in Obsidian settings.

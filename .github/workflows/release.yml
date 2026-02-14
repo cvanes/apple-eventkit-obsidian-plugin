@@ -68,11 +68,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${{ steps.version.outputs.version }}"
-          cp eventkitcli/eventkitcli-universal eventkitcli-binary
+          cp eventkitcli/eventkitcli-universal eventkitcli-bin
           gh release create "$version" \
             --title "$version" \
             --generate-notes \
             main.js \
             manifest.json \
             styles.css \
-            eventkitcli-binary
+            eventkitcli-bin

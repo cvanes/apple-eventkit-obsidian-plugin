@@ -20,7 +20,7 @@ lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$X86_BIN"
 echo "Signing with entitlements..."
 codesign --force --sign - --entitlements eventkitcli.entitlements "$UNIVERSAL_BIN"
 
-cp "$UNIVERSAL_BIN" ../eventkitcli
+cp "$UNIVERSAL_BIN" ../eventkitcli-bin
 
-echo "Installed to ../eventkitcli (plugin directory)"
+echo "Installed to ../eventkitcli-bin (plugin directory)"
 echo "Done."
