@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
+import { Editor, Notice, Plugin } from "obsidian";
 import { chmodSync } from "fs";
 import { execFile } from "child_process";
 import { join } from "path";
@@ -32,10 +32,7 @@ export default class AppleCalendarPlugin extends Plugin {
           item
             .setTitle("Create reminder")
             .setIcon("bell")
-            .onClick(() => {
-              const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-              if (view) this.createReminderFromSelection(editor, view);
-            })
+            .onClick(() => this.createReminderFromSelection(editor))
         );
       })
     );
@@ -59,8 +56,8 @@ export default class AppleCalendarPlugin extends Plugin {
     this.addCommand({
       id: "create-reminder-from-selection",
       name: "Create reminder from selection",
-      editorCallback: (editor: Editor, view: MarkdownView) => {
-        this.createReminderFromSelection(editor, view);
+      editorCallback: (editor: Editor) => {
+        this.createReminderFromSelection(editor);
       },
     });
 
@@ -101,10 +98,7 @@ export default class AppleCalendarPlugin extends Plugin {
     }
   }
 
-  private createReminderFromSelection(
-    editor: Editor,
-    view: MarkdownView
-  ): void {
+  private createReminderFromSelection(editor: Editor): void {
     const selection = editor.getSelection().trim();
     if (!selection) {
       new Notice("Select some text first to create a reminder.");
@@ -115,24 +109,8 @@ export default class AppleCalendarPlugin extends Plugin {
       this.app,
       selection,
       this.settings,
-      this.resolveBridgePath(),
-      async (reminderId, reminderTitle) => {
-        await this.addReminderFrontmatter(view, reminderId, reminderTitle);
-      }
+      this.resolveBridgePath()
     ).open();
-  }
-
-  private async addReminderFrontmatter(
-    view: MarkdownView,
-    reminderId: string,
-    reminderTitle: string
-  ): Promise<void> {
-    const file = view.file;
-    if (!file) return;
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      fm["reminder-id"] = reminderId;
-      fm["reminder-title"] = reminderTitle;
-    });
   }
 
   private async reloadCalendars(): Promise<void> {
