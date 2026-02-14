@@ -1,4 +1,5 @@
 import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
+import { chmodSync } from "fs";
 import { join } from "path";
 import { DEFAULT_SETTINGS, PluginSettings } from "./types";
 import { AppleCalendarSettingTab } from "./settings";
@@ -22,6 +23,8 @@ export default class AppleCalendarPlugin extends Plugin {
     this.addRibbonIcon("calendar", "Apple EventKit", () => {
       this.activateAgendaView();
     });
+
+    this.app.workspace.onLayoutReady(() => this.activateAgendaView());
   }
 
   private registerCommands(): void {
@@ -132,7 +135,15 @@ export default class AppleCalendarPlugin extends Plugin {
 
   private bundledCliPath(): string {
     const vaultPath = (this.app.vault.adapter as any).getBasePath();
-    return join(vaultPath, this.manifest.dir!, "eventkitcli");
+    const cliPath = join(vaultPath, this.manifest.dir!, "eventkitcli");
+    this.ensureExecutable(cliPath);
+    return cliPath;
+  }
+
+  private ensureExecutable(path: string): void {
+    try {
+      chmodSync(path, 0o755);
+    } catch { /* binary may not exist yet */ }
   }
 
   async loadSettings() {
