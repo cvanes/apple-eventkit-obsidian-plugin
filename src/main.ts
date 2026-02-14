@@ -109,7 +109,11 @@ export default class AppleCalendarPlugin extends Plugin {
       this.app,
       selection,
       this.settings,
-      this.resolveBridgePath()
+      this.resolveBridgePath(),
+      (reminderId) => {
+        const link = `[${selection} 🔔](x-apple-reminderkit://REMCDReminder/${reminderId})`;
+        editor.replaceSelection(link);
+      }
     ).open();
   }
 
