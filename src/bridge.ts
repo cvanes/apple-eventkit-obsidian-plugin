@@ -47,6 +47,13 @@ export function fetchEvents(
   return run(bridgePath, args);
 }
 
+export function fetchEvent(
+  bridgePath: string,
+  id: string
+): Promise<BridgeEvent> {
+  return run(bridgePath, ["get-event", `--id=${id}`]);
+}
+
 export function createReminder(
   bridgePath: string,
   listId: string,

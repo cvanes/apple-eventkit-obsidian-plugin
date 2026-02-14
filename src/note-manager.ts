@@ -59,12 +59,7 @@ async function ensureFolder(app: App, folderPath: string): Promise<void> {
 }
 
 function buildFrontmatter(event: BridgeEvent): string {
-  const timestamp = Math.floor(new Date(event.startDate).getTime() / 1000);
-  const lines = [
-    `event-id: "${event.id}"`,
-    `event-link: "calshow:${timestamp}"`,
-  ];
-  return lines.join("\n") + "\n";
+  return `event-id: "${event.id}"\n`;
 }
 
 function sanitizeFilename(name: string): string {
