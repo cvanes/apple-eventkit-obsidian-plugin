@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import type AppleCalendarPlugin from "./main";
 import { BridgeEvent } from "./types";
 import { fetchEvents } from "./bridge";
-import { createOrOpenEventNote } from "./note-manager";
+import { createOrOpenEventNote, syncNoteWithEvent, findNoteForEvent } from "./note-manager";
 import {
   formatDateForDisplay,
   formatDateForCli,
@@ -67,6 +67,7 @@ export class AgendaView extends ItemView {
 
     try {
       this.events = await this.loadEvents();
+      await this.syncLinkedNotes();
       this.renderContent(container, callbacks);
     } catch (e) {
       container.querySelector(".apple-eventkit-loading")?.remove();
@@ -105,6 +106,15 @@ export class AgendaView extends ItemView {
     return this.plugin.settings.calendarToggles
       .filter((t) => t.enabled)
       .map((t) => t.id);
+  }
+
+  private async syncLinkedNotes(): Promise<void> {
+    const settings = this.plugin.settings;
+    for (const event of this.events) {
+      if (findNoteForEvent(this.app, event.id)) {
+        await syncNoteWithEvent(this.app, event, settings);
+      }
+    }
   }
 
   findLinkedEventIds(): Set<string> {

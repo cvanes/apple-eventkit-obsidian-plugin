@@ -2,12 +2,12 @@ import { Editor, Notice, Plugin } from "obsidian";
 import { chmodSync } from "fs";
 import { execFile } from "child_process";
 import { join } from "path";
-import { DEFAULT_SETTINGS, PluginSettings } from "./types";
+import { BridgeEvent, DEFAULT_SETTINGS, PluginSettings } from "./types";
 import { AppleCalendarSettingTab } from "./settings";
 import { AgendaView, VIEW_TYPE_AGENDA } from "./agenda-view";
 import { fetchEvents } from "./bridge";
 import { formatDateForCli, addDays, startOfDay } from "./date-utils";
-import { createOrOpenEventNote } from "./note-manager";
+import { createOrOpenEventNote, linkNoteToEvent, unlinkNoteFromEvent } from "./note-manager";
 import { EventPickerModal } from "./event-picker-modal";
 import { CreateReminderModal } from "./create-reminder-modal";
 
@@ -54,6 +54,29 @@ export default class AppleCalendarPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "link-note-to-event",
+      name: "Link note to calendar event",
+      checkCallback: (checking) => {
+        if (!this.app.workspace.getActiveFile()) return false;
+        if (!checking) this.pickEventAndLinkNote();
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: "unlink-note-from-event",
+      name: "Unlink note from calendar event",
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file) return false;
+        const cache = this.app.metadataCache.getFileCache(file);
+        if (!cache?.frontmatter?.["event-id"]) return false;
+        if (!checking) unlinkNoteFromEvent(this.app);
+        return true;
+      },
+    });
+
+    this.addCommand({
       id: "create-reminder-from-selection",
       name: "Create reminder from selection",
       editorCallback: (editor: Editor) => {
@@ -79,20 +102,34 @@ export default class AppleCalendarPlugin extends Plugin {
     });
   }
 
+  private async fetchUpcomingEvents(): Promise<BridgeEvent[]> {
+    const now = new Date();
+    const today = startOfDay(now);
+    const from = formatDateForCli(today);
+    const to = formatDateForCli(addDays(today, 30));
+    const allEvents = await fetchEvents(this.resolveBridgePath(), from, to);
+    return allEvents
+      .filter((e) => new Date(e.endDate) >= now)
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }
+
   private async pickEventAndCreateNote(): Promise<void> {
     try {
-      const now = new Date();
-      const today = startOfDay(now);
-      const from = formatDateForCli(today);
-      const to = formatDateForCli(addDays(today, 30));
-      const allEvents = await fetchEvents(this.resolveBridgePath(), from, to);
-      const events = allEvents
-        .filter((e) => new Date(e.endDate) >= now)
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-
+      const events = await this.fetchUpcomingEvents();
       new EventPickerModal(this.app, events, (event) => {
         createOrOpenEventNote(this.app, event, this.settings);
       }).open();
+    } catch (e) {
+      new Notice(`Failed to load events: ${e}`);
+    }
+  }
+
+  private async pickEventAndLinkNote(): Promise<void> {
+    try {
+      const events = await this.fetchUpcomingEvents();
+      new EventPickerModal(this.app, events, (event) => {
+        linkNoteToEvent(this.app, event, this.settings);
+      }, "Pick an event to link to this note...").open();
     } catch (e) {
       new Notice(`Failed to load events: ${e}`);
     }

@@ -9,12 +9,13 @@ export class EventPickerModal extends SuggestModal<BridgeEvent> {
   constructor(
     app: App,
     events: BridgeEvent[],
-    onSelect: (event: BridgeEvent) => void
+    onSelect: (event: BridgeEvent) => void,
+    placeholder = "Pick an event..."
   ) {
     super(app);
     this.events = events;
     this.onSelect = onSelect;
-    this.setPlaceholder("Pick an event to create a note for...");
+    this.setPlaceholder(placeholder);
   }
 
   getSuggestions(query: string): BridgeEvent[] {
