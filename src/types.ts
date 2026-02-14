@@ -2,6 +2,7 @@ export interface CalendarToggle {
   id: string;
   title: string;
   color: string;
+  source: string;
   enabled: boolean;
 }
 
@@ -25,6 +26,7 @@ export interface BridgeCalendar {
   id: string;
   title: string;
   color: string;
+  source: string;
 }
 
 export interface BridgeEvent {

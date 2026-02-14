@@ -4,6 +4,7 @@ struct CalendarInfo: Codable {
     let id: String
     let title: String
     let color: String
+    let source: String
 }
 
 struct EventInfo: Codable {

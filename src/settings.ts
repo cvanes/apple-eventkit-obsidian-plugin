@@ -105,16 +105,33 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
         })
       );
 
-    for (const toggle of this.plugin.settings.calendarToggles) {
-      this.addCalendarToggle(containerEl, toggle);
-    }
-
-    if (this.plugin.settings.calendarToggles.length === 0) {
+    const toggles = this.plugin.settings.calendarToggles;
+    if (toggles.length === 0) {
       containerEl.createEl("p", {
         text: 'No calendars loaded. Click "Refresh" above.',
         cls: "setting-item-description",
       });
+      return;
     }
+
+    const grouped = this.groupBySource(toggles);
+    for (const [source, items] of grouped) {
+      new Setting(containerEl).setName(source).setHeading();
+      for (const toggle of items) {
+        this.addCalendarToggle(containerEl, toggle);
+      }
+    }
+  }
+
+  private groupBySource(toggles: CalendarToggle[]): Map<string, CalendarToggle[]> {
+    const groups = new Map<string, CalendarToggle[]>();
+    for (const toggle of toggles) {
+      const source = toggle.source || "Other";
+      const list = groups.get(source) ?? [];
+      list.push(toggle);
+      groups.set(source, list);
+    }
+    return groups;
   }
 
   private addCalendarToggle(
@@ -150,6 +167,7 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
         id: cal.id,
         title: cal.title,
         color: cal.color,
+        source: cal.source,
         enabled: existing.get(cal.id) ?? true,
       }));
       await this.plugin.saveSettings();

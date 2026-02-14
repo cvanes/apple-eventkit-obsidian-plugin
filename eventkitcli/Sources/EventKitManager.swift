@@ -161,7 +161,7 @@ class EventKitManager {
     }
 
     private func calendarInfo(_ cal: EKCalendar) -> CalendarInfo {
-        CalendarInfo(id: cal.calendarIdentifier, title: cal.title, color: hexColor(cal.cgColor))
+        CalendarInfo(id: cal.calendarIdentifier, title: cal.title, color: hexColor(cal.cgColor), source: cal.source.title)
     }
 
     private func eventInfo(_ event: EKEvent) -> EventInfo {

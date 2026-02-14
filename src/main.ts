@@ -5,7 +5,7 @@ import { join } from "path";
 import { DEFAULT_SETTINGS, PluginSettings } from "./types";
 import { AppleCalendarSettingTab } from "./settings";
 import { AgendaView, VIEW_TYPE_AGENDA } from "./agenda-view";
-import { fetchEvent, fetchEvents } from "./bridge";
+import { fetchEvents } from "./bridge";
 import { formatDateForCli, addDays, startOfDay } from "./date-utils";
 import { createOrOpenEventNote } from "./note-manager";
 import { EventPickerModal } from "./event-picker-modal";
@@ -68,9 +68,9 @@ export default class AppleCalendarPlugin extends Plugin {
       id: "open-event-in-calendar",
       name: "Open event in Calendar",
       checkCallback: (checking) => {
-        const eventId = this.getActiveEventId();
-        if (!eventId) return false;
-        if (!checking) this.openEventInCalendar(eventId);
+        const date = this.getActiveEventDate();
+        if (!date) return false;
+        if (!checking) this.openDateInCalendar(date);
         return true;
       },
     });
@@ -147,33 +147,28 @@ export default class AppleCalendarPlugin extends Plugin {
     new Notice("Calendars reloaded.");
   }
 
-  private getActiveEventId(): string | null {
+  private getActiveEventDate(): string | null {
     const file = this.app.workspace.getActiveFile();
     if (!file) return null;
     const cache = this.app.metadataCache.getFileCache(file);
-    return cache?.frontmatter?.["event-id"] ?? null;
+    return cache?.frontmatter?.["event-date"] ?? null;
   }
 
-  private async openEventInCalendar(eventId: string): Promise<void> {
-    try {
-      const event = await fetchEvent(this.resolveBridgePath(), eventId);
-      const d = new Date(event.startDate);
-      const script = [
-        "tell application \"Calendar\"",
-        "activate",
-        "set d to current date",
-        `set year of d to ${d.getFullYear()}`,
-        `set month of d to ${d.getMonth() + 1}`,
-        `set day of d to ${d.getDate()}`,
-        "view calendar at d",
-        "end tell",
-      ].join("\n");
-      execFile("osascript", ["-e", script], (err) => {
-        if (err) new Notice(`Failed to open Calendar: ${err.message}`);
-      });
-    } catch (e) {
-      new Notice(`Failed to open event: ${e}`);
-    }
+  private openDateInCalendar(dateStr: string): void {
+    const d = new Date(dateStr + "T00:00:00");
+    const script = [
+      "tell application \"Calendar\"",
+      "activate",
+      "set d to current date",
+      `set year of d to ${d.getFullYear()}`,
+      `set month of d to ${d.getMonth() + 1}`,
+      `set day of d to ${d.getDate()}`,
+      "view calendar at d",
+      "end tell",
+    ].join("\n");
+    execFile("osascript", ["-e", script], (err) => {
+      if (err) new Notice(`Failed to open Calendar: ${err.message}`);
+    });
   }
 
   async activateAgendaView(): Promise<void> {

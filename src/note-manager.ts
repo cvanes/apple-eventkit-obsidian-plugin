@@ -59,7 +59,8 @@ async function ensureFolder(app: App, folderPath: string): Promise<void> {
 }
 
 function buildFrontmatter(event: BridgeEvent): string {
-  return `event-id: "${event.id}"\n`;
+  const date = new Date(event.startDate).toISOString().slice(0, 10);
+  return `event-id: "${event.id}"\nevent-date: ${date}\n`;
 }
 
 function sanitizeFilename(name: string): string {
