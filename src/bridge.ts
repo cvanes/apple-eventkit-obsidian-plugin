@@ -54,8 +54,8 @@ export function createReminder(
   dueDate?: string,
   notes?: string
 ): Promise<BridgeReminder> {
-  const args = ["create-reminder", "--list", listId, "--title", title];
-  if (dueDate) args.push("--due", dueDate);
-  if (notes) args.push("--notes", notes);
+  const args = ["create-reminder", `--list=${listId}`, `--title=${title}`];
+  if (dueDate) args.push(`--due=${dueDate}`);
+  if (notes) args.push(`--notes=${notes}`);
   return run(bridgePath, args);
 }

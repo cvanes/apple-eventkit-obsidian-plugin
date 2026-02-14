@@ -1,5 +1,6 @@
 import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
 import { chmodSync } from "fs";
+import { execFile } from "child_process";
 import { join } from "path";
 import { DEFAULT_SETTINGS, PluginSettings } from "./types";
 import { AppleCalendarSettingTab } from "./settings";
@@ -23,6 +24,21 @@ export default class AppleCalendarPlugin extends Plugin {
     this.addRibbonIcon("calendar", "Apple EventKit", () => {
       this.activateAgendaView();
     });
+
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor) => {
+        if (!editor.getSelection().trim()) return;
+        menu.addItem((item) =>
+          item
+            .setTitle("Create reminder")
+            .setIcon("bell")
+            .onClick(() => {
+              const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+              if (view) this.createReminderFromSelection(editor, view);
+            })
+        );
+      })
+    );
 
     this.app.workspace.onLayoutReady(() => this.activateAgendaView());
   }
@@ -49,6 +65,17 @@ export default class AppleCalendarPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "open-event-in-calendar",
+      name: "Open event in Calendar",
+      checkCallback: (checking) => {
+        const link = this.getActiveEventLink();
+        if (!link) return false;
+        if (!checking) this.openInCalendar(link);
+        return true;
+      },
+    });
+
+    this.addCommand({
       id: "reload-calendars",
       name: "Reload calendars",
       callback: () => this.reloadCalendars(),
@@ -57,10 +84,14 @@ export default class AppleCalendarPlugin extends Plugin {
 
   private async pickEventAndCreateNote(): Promise<void> {
     try {
-      const today = startOfDay(new Date());
-      const from = formatDateForCli(addDays(today, -7));
+      const now = new Date();
+      const today = startOfDay(now);
+      const from = formatDateForCli(today);
       const to = formatDateForCli(addDays(today, 30));
-      const events = await fetchEvents(this.resolveBridgePath(), from, to);
+      const allEvents = await fetchEvents(this.resolveBridgePath(), from, to);
+      const events = allEvents
+        .filter((e) => new Date(e.endDate) >= now)
+        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
       new EventPickerModal(this.app, events, (event) => {
         createOrOpenEventNote(this.app, event, this.settings);
@@ -114,6 +145,19 @@ export default class AppleCalendarPlugin extends Plugin {
       }
     }
     new Notice("Calendars reloaded.");
+  }
+
+  private getActiveEventLink(): string | null {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) return null;
+    const cache = this.app.metadataCache.getFileCache(file);
+    return cache?.frontmatter?.["event-link"] ?? null;
+  }
+
+  private openInCalendar(link: string): void {
+    execFile("open", [link], (err) => {
+      if (err) new Notice(`Failed to open Calendar: ${err.message}`);
+    });
   }
 
   async activateAgendaView(): Promise<void> {

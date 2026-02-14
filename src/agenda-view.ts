@@ -42,8 +42,14 @@ export class AgendaView extends ItemView {
     return "calendar";
   }
 
+  private refreshTimer: number | null = null;
+
   async onOpen(): Promise<void> {
     await this.refresh();
+    this.refreshTimer = window.setInterval(() => this.refresh(), 5 * 60_000);
+    this.register(() => {
+      if (this.refreshTimer) window.clearInterval(this.refreshTimer);
+    });
   }
 
   async refresh(): Promise<void> {

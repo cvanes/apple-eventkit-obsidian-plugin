@@ -17,7 +17,7 @@
   color: var(--text-muted);
   font-size: var(--font-ui-medium);
   padding: var(--size-4-1) var(--size-4-2);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
 }
 
 .apple-eventkit-nav-btn:hover {
@@ -44,7 +44,7 @@
 .apple-eventkit-btn {
   background: none;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
   padding: var(--size-2-1) var(--size-4-2);
   cursor: pointer;
   color: var(--text-muted);
