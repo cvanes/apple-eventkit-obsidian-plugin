@@ -15,6 +15,11 @@ export default class AppleCalendarPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
 
   async onload() {
+    if (process.platform !== "darwin") {
+      new Notice("Apple EventKit requires macOS.");
+      return;
+    }
+
     await this.loadSettings();
 
     this.registerView(VIEW_TYPE_AGENDA, (leaf) => new AgendaView(leaf, this));
