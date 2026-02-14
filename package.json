@@ -1,6 +1,6 @@
 {
   "name": "obsidian-apple-eventkit-plugin",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Apple Calendar and Reminders integration for Obsidian",
   "main": "main.js",
   "scripts": {
