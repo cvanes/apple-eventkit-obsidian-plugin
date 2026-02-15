@@ -26,7 +26,7 @@ export default class AppleCalendarPlugin extends Plugin {
     this.addSettingTab(new AppleCalendarSettingTab(this.app, this));
     this.registerCommands();
 
-    this.addRibbonIcon("calendar", "Apple EventKit", () => {
+    this.addRibbonIcon("calendar-days", "Apple EventKit", () => {
       this.activateAgendaView();
     });
 

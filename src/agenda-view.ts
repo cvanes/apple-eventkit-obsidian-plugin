@@ -39,7 +39,7 @@ export class AgendaView extends ItemView {
   }
 
   getIcon(): string {
-    return "calendar";
+    return "calendar-days";
   }
 
   private refreshTimer: number | null = null;
