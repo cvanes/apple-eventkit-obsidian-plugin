@@ -54,7 +54,7 @@ export default class AppleCalendarPlugin extends Plugin {
 
     this.addCommand({
       id: "create-note-for-event",
-      name: "Create note for event",
+      name: "Create/Open note for event",
       callback: () => this.pickEventAndCreateNote(),
     });
 
