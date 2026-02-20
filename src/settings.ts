@@ -105,6 +105,26 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
         })
       );
 
+    new Setting(containerEl)
+      .setName("Hide all day events in agenda")
+      .setDesc("Filter out all day events from the agenda sidebar.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.hideAllDayInAgenda).onChange(async (value) => {
+          this.plugin.settings.hideAllDayInAgenda = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Hide all day events in calendar modals")
+      .setDesc("Filter out all day events from event picker modals.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.hideAllDayInModals).onChange(async (value) => {
+          this.plugin.settings.hideAllDayInModals = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
     const toggles = this.plugin.settings.calendarToggles;
     if (toggles.length === 0) {
       containerEl.createEl("p", {

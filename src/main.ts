@@ -115,6 +115,7 @@ export default class AppleCalendarPlugin extends Plugin {
     const allEvents = await fetchEvents(this.resolveBridgePath(), from, to);
     return allEvents
       .filter((e) => new Date(e.endDate) >= now)
+      .filter((e) => !this.settings.hideAllDayInModals || !e.isAllDay)
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   }
 

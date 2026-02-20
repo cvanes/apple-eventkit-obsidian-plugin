@@ -10,6 +10,8 @@ export interface PluginSettings {
   dateFormat: string;
   noteFolderPath: string;
   defaultReminderList: string;
+  hideAllDayInAgenda: boolean;
+  hideAllDayInModals: boolean;
   calendarToggles: CalendarToggle[];
   bridgePath: string;
 }
@@ -18,6 +20,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   dateFormat: "YYYY-MM-DD",
   noteFolderPath: "",
   defaultReminderList: "",
+  hideAllDayInAgenda: false,
+  hideAllDayInModals: false,
   calendarToggles: [],
   bridgePath: "",
 };

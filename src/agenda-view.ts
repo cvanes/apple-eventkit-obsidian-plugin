@@ -99,6 +99,9 @@ export class AgendaView extends ItemView {
       dateStr,
       enabledIds.length > 0 ? enabledIds : undefined
     );
+    if (this.plugin.settings.hideAllDayInAgenda) {
+      return events.filter((e) => !e.isAllDay);
+    }
     return events;
   }
 
