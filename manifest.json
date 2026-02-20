@@ -1,7 +1,7 @@
 {
   "id": "apple-eventkit",
   "name": "Apple EventKit",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "minAppVersion": "0.15.0",
   "description": "Integrate with Apple Calendar and Reminders on macOS. View daily agenda, create linked notes and reminders.",
   "author": "Chris van Es",
