@@ -53,6 +53,12 @@ export default class AppleCalendarPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "view-today",
+      name: "View today",
+      callback: () => this.activateAgendaViewToday(),
+    });
+
+    this.addCommand({
       id: "create-note-for-event",
       name: "Create/Open note for event",
       callback: () => this.pickEventAndCreateNote(),
@@ -194,6 +200,14 @@ export default class AppleCalendarPlugin extends Plugin {
     execFile("osascript", ["-e", script], (err) => {
       if (err) new Notice(`Failed to open Calendar: ${err.message}`);
     });
+  }
+
+  async activateAgendaViewToday(): Promise<void> {
+    await this.activateAgendaView();
+    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_AGENDA)[0];
+    if (leaf?.view instanceof AgendaView) {
+      await leaf.view.showToday();
+    }
   }
 
   async activateAgendaView(): Promise<void> {

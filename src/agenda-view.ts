@@ -147,9 +147,13 @@ export class AgendaView extends ItemView {
     await this.refresh();
   }
 
-  private async goToToday(): Promise<void> {
+  async showToday(): Promise<void> {
     this.currentDate = startOfDay(new Date());
     await this.refresh();
+  }
+
+  private async goToToday(): Promise<void> {
+    await this.showToday();
   }
 
   private async goToDate(dateStr: string): Promise<void> {
