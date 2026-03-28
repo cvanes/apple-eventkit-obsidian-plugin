@@ -53,26 +53,17 @@ jobs:
         run: npm run build
 
       - name: Build eventkitcli
-        run: |
-          cd eventkitcli
-          swift build -c release --arch arm64
-          swift build -c release --arch x86_64
-          lipo -create \
-            .build/arm64-apple-macosx/release/eventkitcli \
-            .build/x86_64-apple-macosx/release/eventkitcli \
-            -output eventkitcli-universal
-          codesign --force --sign - --entitlements eventkitcli.entitlements eventkitcli-universal
+        run: bash eventkitcli/build.sh
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${{ steps.version.outputs.version }}"
-          cp eventkitcli/eventkitcli-universal eventkitcli-bin
           gh release create "$version" \
             --title "$version" \
             --generate-notes \
             main.js \
             manifest.json \
             styles.css \
-            eventkitcli-bin
+            eventkitcli/.build/eventkitcli
