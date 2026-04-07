@@ -7,7 +7,6 @@ export class CreateReminderModal extends Modal {
   title: string;
   settings: PluginSettings;
   bridgePath: string;
-  onCreated: (reminderId: string) => void;
 
   private selectedListId = "";
   private dueDateInput = "";
@@ -17,14 +16,12 @@ export class CreateReminderModal extends Modal {
     app: App,
     title: string,
     settings: PluginSettings,
-    bridgePath: string,
-    onCreated: (reminderId: string) => void
+    bridgePath: string
   ) {
     super(app);
     this.title = title;
     this.settings = settings;
     this.bridgePath = bridgePath;
-    this.onCreated = onCreated;
     this.selectedListId = settings.defaultReminderList;
   }
 
@@ -107,7 +104,6 @@ export class CreateReminderModal extends Modal {
         dueIso
       );
       new Notice(`Reminder created: ${reminder.title}`);
-      this.onCreated(reminder.id);
       this.close();
     } catch (e) {
       new Notice(`Failed to create reminder: ${e}`);

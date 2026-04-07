@@ -1,6 +1,6 @@
 import { App, Notice, TFile, normalizePath } from "obsidian";
 import { BridgeEvent, PluginSettings } from "./types";
-import { formatNoteDate, expandDateTokens } from "./date-utils";
+import { formatNoteDate } from "./date-utils";
 
 export function findNoteForEvent(app: App, eventId: string): TFile | null {
   for (const file of app.vault.getMarkdownFiles()) {
@@ -26,8 +26,7 @@ export async function createOrOpenEventNote(
 
 export async function linkNoteToEvent(
   app: App,
-  event: BridgeEvent,
-  settings: PluginSettings
+  event: BridgeEvent
 ): Promise<void> {
   const file = app.workspace.getActiveFile();
   if (!file) {
@@ -35,7 +34,6 @@ export async function linkNoteToEvent(
     return;
   }
   await updateFrontmatterIfNeeded(app, file, event);
-  await renameNoteIfNeeded(app, file, event, settings);
   new Notice(`Linked to: ${event.title}`);
 }
 
@@ -54,13 +52,11 @@ export async function unlinkNoteFromEvent(app: App): Promise<void> {
 
 export async function syncNoteWithEvent(
   app: App,
-  event: BridgeEvent,
-  settings: PluginSettings
+  event: BridgeEvent
 ): Promise<void> {
   const file = findNoteForEvent(app, event.id);
   if (!file) return;
   await updateFrontmatterIfNeeded(app, file, event);
-  await renameNoteIfNeeded(app, file, event, settings);
 }
 
 async function createEventNote(
@@ -68,13 +64,22 @@ async function createEventNote(
   event: BridgeEvent,
   settings: PluginSettings
 ): Promise<TFile> {
-  const eventDate = new Date(event.startDate);
-  const folderPath = resolveFolderPath(settings.noteFolderPath, eventDate);
-  await ensureFolder(app, folderPath);
-
   const fullPath = buildNotePath(event, settings);
+  const folder = fullPath.substring(0, fullPath.lastIndexOf("/"));
+  if (folder) await ensureFolder(app, folder);
+
   const frontmatter = buildFrontmatter(event);
-  return app.vault.create(fullPath, `---\n${frontmatter}---\n`);
+  const templateContent = await readTemplate(app, settings.templateFilePath);
+  const body = templateContent ? `\n${templateContent}` : "";
+  return app.vault.create(fullPath, `---\n${frontmatter}---\n${body}`);
+}
+
+async function readTemplate(app: App, path: string): Promise<string | null> {
+  if (!path) return null;
+  const normalized = normalizePath(path.endsWith(".md") ? path : `${path}.md`);
+  const file = app.vault.getAbstractFileByPath(normalized);
+  if (!(file instanceof TFile)) return null;
+  return app.vault.read(file);
 }
 
 async function updateFrontmatterIfNeeded(
@@ -92,26 +97,12 @@ async function updateFrontmatterIfNeeded(
   });
 }
 
-async function renameNoteIfNeeded(
-  app: App,
-  file: TFile,
-  event: BridgeEvent,
-  settings: PluginSettings
-): Promise<void> {
-  const expectedPath = buildNotePath(event, settings);
-  if (file.path === expectedPath) return;
-  const folder = expectedPath.substring(0, expectedPath.lastIndexOf("/"));
-  if (folder) await ensureFolder(app, folder);
-  await app.fileManager.renameFile(file, expectedPath);
-}
-
 function buildNotePath(event: BridgeEvent, settings: PluginSettings): string {
   const eventDate = new Date(event.startDate);
-  const folderPath = resolveFolderPath(settings.noteFolderPath, eventDate);
-  const datePrefix = formatNoteDate(eventDate, settings.dateFormat);
-  const filename = `${datePrefix} - ${sanitizeFilename(event.title)}.md`;
-  return folderPath
-    ? normalizePath(`${folderPath}/${filename}`)
+  const datePath = formatNoteDate(eventDate, settings.dateFormat);
+  const filename = `${datePath} - ${sanitizeFilename(event.title)}.md`;
+  return settings.noteFolderPath
+    ? normalizePath(`${settings.noteFolderPath}/${filename}`)
     : normalizePath(filename);
 }
 
@@ -122,11 +113,6 @@ export function buildFrontmatter(event: BridgeEvent): string {
 
 function eventDateString(event: BridgeEvent): string {
   return new Date(event.startDate).toISOString().slice(0, 10);
-}
-
-function resolveFolderPath(template: string, date: Date): string {
-  if (!template) return "";
-  return expandDateTokens(template, date);
 }
 
 async function ensureFolder(app: App, folderPath: string): Promise<void> {

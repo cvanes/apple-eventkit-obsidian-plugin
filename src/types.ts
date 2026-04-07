@@ -9,6 +9,7 @@ export interface CalendarToggle {
 export interface PluginSettings {
   dateFormat: string;
   noteFolderPath: string;
+  templateFilePath: string;
   defaultReminderList: string;
   hideAllDayInAgenda: boolean;
   hideAllDayInModals: boolean;
@@ -19,6 +20,7 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
   dateFormat: "YYYY-MM-DD",
   noteFolderPath: "",
+  templateFilePath: "",
   defaultReminderList: "",
   hideAllDayInAgenda: false,
   hideAllDayInModals: false,

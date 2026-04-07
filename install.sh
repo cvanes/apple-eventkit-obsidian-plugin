@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-DEST="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Second Brain/.obsidian/plugins/apple-eventkit-obsidian-plugin"
+DEST="$HOME/Obsidian/.obsidian/plugins/apple-eventkit-obsidian-plugin"
 
 echo "Building eventkitcli..."
 bash eventkitcli/build.sh

@@ -1,7 +1,15 @@
-import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, moment } from "obsidian";
 import type AppleCalendarPlugin from "./main";
 import { fetchCalendars, fetchReminderLists } from "./bridge";
 import { CalendarToggle } from "./types";
+import { FileSuggest, FolderSuggest } from "./file-suggest";
+
+const DATE_FORMAT_PRESETS: { label: string; value: string }[] = [
+  { label: "YYYY-MM-DD", value: "YYYY-MM-DD" },
+  { label: "YYYY.MM.DD", value: "YYYY.MM.DD" },
+  { label: "YYYY/MM/DD", value: "YYYY/MM/DD" },
+  { label: "YYYY/MM/YYYY-MM-DD", value: "YYYY/MM/YYYY-MM-DD" },
+];
 
 export class AppleCalendarSettingTab extends PluginSettingTab {
   plugin: AppleCalendarPlugin;
@@ -24,34 +32,84 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
   private addNoteSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName("Notes").setHeading();
 
-    new Setting(containerEl)
-      .setName("Date format")
-      .setDesc("Format for the date prefix in note titles (moment.js tokens).")
-      .addText((text) =>
-        text
-          .setPlaceholder("YYYY-MM-DD")
-          .setValue(this.plugin.settings.dateFormat)
-          .onChange(async (value) => {
-            this.plugin.settings.dateFormat = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    const isPreset = DATE_FORMAT_PRESETS.some(
+      (p) => p.value === this.plugin.settings.dateFormat
+    );
+
+    const customSetting = new Setting(containerEl).setClass("custom-format-setting");
+    customSetting.settingEl.style.display = "none";
+
+    const updateCustomField = (show: boolean) => {
+      customSetting.settingEl.style.display = show ? "" : "none";
+      if (show) {
+        const preview = moment().format(this.plugin.settings.dateFormat);
+        customSetting.clear();
+        customSetting
+          .setName("Custom format")
+          .setDesc(`For more syntax, refer to the moment.js format reference. Your current syntax looks like this: ${preview}`)
+          .addText((text) =>
+            text
+              .setPlaceholder("YYYY/MM/YYYY-MM-DD")
+              .setValue(this.plugin.settings.dateFormat)
+              .onChange(async (value) => {
+                this.plugin.settings.dateFormat = value;
+                await this.plugin.saveSettings();
+              })
+          );
+      }
+    };
 
     new Setting(containerEl)
-      .setName("Note folder path")
-      .setDesc(
-        "Folder for event notes. Supports date tokens (e.g. YYYY/MM). Leave empty for vault root."
-      )
-      .addText((text) =>
+      .setName("Date format")
+      .setDesc("Choose how event notes are named in your vault.")
+      .addDropdown((dd) => {
+        for (const preset of DATE_FORMAT_PRESETS) {
+          dd.addOption(preset.value, moment().format(preset.value));
+        }
+        dd.addOption("custom", "Custom");
+        dd.setValue(isPreset ? this.plugin.settings.dateFormat : "custom");
+        dd.onChange(async (value) => {
+          if (value !== "custom") {
+            this.plugin.settings.dateFormat = value;
+            await this.plugin.saveSettings();
+            updateCustomField(false);
+          } else {
+            updateCustomField(true);
+          }
+        });
+      });
+
+    // Move custom field after the dropdown setting
+    containerEl.append(customSetting.settingEl);
+    updateCustomField(!isPreset);
+
+    new Setting(containerEl)
+      .setName("New file location")
+      .setDesc("New event notes will be placed here.")
+      .addText((text) => {
         text
-          .setPlaceholder("e.g. Calendar/YYYY/MM")
+          .setPlaceholder("Example: folder 1/folder")
           .setValue(this.plugin.settings.noteFolderPath)
           .onChange(async (value) => {
             this.plugin.settings.noteFolderPath = value;
             await this.plugin.saveSettings();
-          })
-      );
+          });
+        new FolderSuggest(this.app, text.inputEl);
+      });
 
+    new Setting(containerEl)
+      .setName("Template file location")
+      .setDesc("Choose the file to use as a template.")
+      .addText((text) => {
+        text
+          .setPlaceholder("Example: folder/note")
+          .setValue(this.plugin.settings.templateFilePath)
+          .onChange(async (value) => {
+            this.plugin.settings.templateFilePath = value;
+            await this.plugin.saveSettings();
+          });
+        new FileSuggest(this.app, text.inputEl);
+      });
   }
 
   private addReminderSettings(containerEl: HTMLElement): void {

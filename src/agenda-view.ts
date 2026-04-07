@@ -112,10 +112,9 @@ export class AgendaView extends ItemView {
   }
 
   private async syncLinkedNotes(): Promise<void> {
-    const settings = this.plugin.settings;
     for (const event of this.events) {
       if (findNoteForEvent(this.app, event.id)) {
-        await syncNoteWithEvent(this.app, event, settings);
+        await syncNoteWithEvent(this.app, event);
       }
     }
   }

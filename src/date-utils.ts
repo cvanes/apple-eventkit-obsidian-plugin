@@ -16,10 +16,6 @@ export function formatNoteDate(date: Date, format: string): string {
   return moment(date).format(format);
 }
 
-export function expandDateTokens(template: string, date: Date): string {
-  return moment(date).format(template);
-}
-
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);

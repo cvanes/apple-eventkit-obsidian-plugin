@@ -140,7 +140,7 @@ export default class AppleCalendarPlugin extends Plugin {
     try {
       const events = await this.fetchUpcomingEvents();
       new EventPickerModal(this.app, events, (event) => {
-        linkNoteToEvent(this.app, event, this.settings);
+        linkNoteToEvent(this.app, event);
       }, "Pick an event to link to this note...").open();
     } catch (e) {
       new Notice(`Failed to load events: ${e}`);
@@ -158,11 +158,7 @@ export default class AppleCalendarPlugin extends Plugin {
       this.app,
       selection,
       this.settings,
-      this.resolveBridgePath(),
-      (reminderId) => {
-        const link = `[${selection} 🔔](x-apple-reminderkit://REMCDReminder/${reminderId})`;
-        editor.replaceSelection(link);
-      }
+      this.resolveBridgePath()
     ).open();
   }
 
