@@ -61,6 +61,14 @@ sqlite3 "$HOME/Library/Application Support/com.apple.TCC/TCC.db" \
 `auth_value` 2 is allowed, 0 is denied. A *missing* row means never asked — which should prompt, and
 will not if the Info.plist is absent or the process cannot show UI.
 
+**The host app needs the usage description too.** Embedding `Info.plist` in `eventkitcli` is necessary
+but not sufficient: because TCC attributes to the responsible process, the launching app must also
+declare the relevant `NS*UsageDescription`. If it does not, no prompt can appear and the app never
+shows up in the Privacy pane to be enabled manually. Observed in practice — iTerm declares and holds
+both Calendars and Reminders, while cmux declares Apple Events, Bluetooth, Camera and Microphone but
+no Calendars, so `list-calendars` fails there and cannot be fixed from System Settings. `PermissionError`
+reports the launching app (from `TERM_PROGRAM`) so the denial is diagnosable rather than misleading.
+
 ## Reminder list resolution
 
 `--list` accepts either a list title or an identifier, resolved by `EventKitManager.resolveReminderList`.

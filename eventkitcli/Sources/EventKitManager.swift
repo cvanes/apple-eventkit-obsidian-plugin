@@ -290,12 +290,37 @@ enum PermissionError: LocalizedError {
     case calendarDenied
     case reminderDenied
 
+    /// TCC attributes a command-line tool's request to the *responsible process* --
+    /// normally the terminal or app that launched it, not eventkitcli. So a denial
+    /// usually means the host app lacks the grant, and pointing the user straight at
+    /// System Settings is misleading: if the host app has no usage description for
+    /// this data, no prompt can ever appear and it will not be listed in the pane.
+    static func denialHelp(entity: String, pane: String) -> String {
+        let host = ProcessInfo.processInfo.environment["TERM_PROGRAM"]
+            ?? ProcessInfo.processInfo.environment["__CFBundleIdentifier"]
+            ?? "the current app"
+        let lines = [
+            "\(entity) access denied.",
+            "",
+            "Permission is granted to the app that launched eventkitcli "
+                + "(here: \(host)), not to eventkitcli itself.",
+            "",
+            "Try, in order:",
+            "  1. System Settings > Privacy & Security > \(pane) - enable the launching app if listed.",
+            "  2. Run the same command from a terminal that already has access.",
+            "  3. If the launching app is not listed at all, it has no \(pane) usage "
+                + "description in its Info.plist, so macOS cannot prompt for it. "
+                + "That has to be fixed in that app.",
+        ]
+        return lines.joined(separator: "\n")
+    }
+
     var errorDescription: String? {
         switch self {
         case .calendarDenied:
-            return "Calendar access denied. Grant permission in System Settings > Privacy & Security > Calendars."
+            return Self.denialHelp(entity: "Calendar", pane: "Calendars")
         case .reminderDenied:
-            return "Reminders access denied. Grant permission in System Settings > Privacy & Security > Reminders."
+            return Self.denialHelp(entity: "Reminders", pane: "Reminders")
         }
     }
 }
