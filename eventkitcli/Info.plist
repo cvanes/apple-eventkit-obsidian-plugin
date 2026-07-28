@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>co.instil.eventkitcli</string>
+    <key>CFBundleName</key>
+    <string>eventkitcli</string>
+    <key>CFBundleExecutable</key>
+    <string>eventkitcli</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <!--
+      TCC requires a usage description on the requesting binary. Without these,
+      macOS 14+ refuses EventKit access and returns denied WITHOUT showing a
+      prompt, which reads as a revoked permission but is not one. A bare
+      command-line tool has no bundle, so the plist is embedded into the binary
+      via -sectcreate __TEXT __info_plist (see Package.swift).
+    -->
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>eventkitcli reads and writes calendar events so Obsidian can show your agenda and link notes to events.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>eventkitcli reads and writes reminders so Obsidian can show and complete them alongside your agenda.</string>
+
+    <!-- Pre-macOS 14 key names, kept for older systems. -->
+    <key>NSCalendarsUsageDescription</key>
+    <string>eventkitcli reads and writes calendar events so Obsidian can show your agenda and link notes to events.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>eventkitcli reads and writes reminders so Obsidian can show and complete them alongside your agenda.</string>
+</dict>
+</plist>

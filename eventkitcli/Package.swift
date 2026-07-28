@@ -13,7 +13,18 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources"
+            path: "Sources",
+            linkerSettings: [
+                // TCC needs a usage description on the requesting binary. A bare CLI has
+                // no bundle, so embed Info.plist into a __TEXT,__info_plist section.
+                // Without it macOS 14+ denies EventKit access and never prompts.
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Info.plist",
+                ])
+            ]
         ),
     ]
 )

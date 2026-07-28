@@ -31,6 +31,33 @@ only touches `child_process`, `fs`, `path` and `util`, so the surface is stable 
 - Event notes are linked to calendar events via `event-id` in frontmatter. Note lookup scans `app.metadataCache`.
 - Settings support moment.js date tokens in `noteFolderPath` (e.g. `YYYY/MM`). Empty path means vault root.
 
+## TCC permissions and the embedded Info.plist
+
+EventKit access is gated by TCC, and TCC requires a usage description on the requesting binary.
+A bare command-line tool has no bundle, so `Info.plist` is embedded into a `__TEXT,__info_plist`
+section via linker flags in `Package.swift`. **Without it, macOS 14+ denies access and never shows a
+prompt** — which presents as a revoked permission when in fact no permission was ever requested.
+
+Verify it is present after a build:
+
+```sh
+otool -X -s __TEXT __info_plist .build/eventkitcli | head -3
+```
+
+Permission is attributed to the *responsible process*, not to `eventkitcli`. Running it from iTerm
+uses iTerm's grant; running it from Obsidian uses Obsidian's; running it from a headless agent uses
+that agent's. So a permission can appear granted in one context and denied in another. Inspect the
+records with:
+
+```sh
+sqlite3 "$HOME/Library/Application Support/com.apple.TCC/TCC.db" \
+  "select service, client, auth_value from access
+   where service in ('kTCCServiceCalendar','kTCCServiceReminders');"
+```
+
+`auth_value` 2 is allowed, 0 is denied. A *missing* row means never asked — which should prompt, and
+will not if the Info.plist is absent or the process cannot show UI.
+
 ## Reminder list resolution
 
 `--list` accepts either a list title or an identifier, resolved by `EventKitManager.resolveReminderList`.
