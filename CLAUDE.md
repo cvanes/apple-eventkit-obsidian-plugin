@@ -9,6 +9,16 @@ The plugin has two parts:
 1. **`eventkitcli`** — A standalone Swift CLI tool that wraps Apple's EventKit framework. Bundled alongside the plugin in its directory. All commands output JSON to stdout.
 2. **`src/`** — The Obsidian plugin (TypeScript). Calls `eventkitcli` via `child_process.execFile` through a bridge layer (`bridge.ts`).
 
+## Toolchain
+
+Node is pinned to 24.8.0 in `.node-version` (nodenv/fnm/asdf all read it) and enforced by
+`engines.node: ">=24"`. Run `npm ci` before the first build — an empty `node_modules` surfaces as
+~130 `Cannot find module 'obsidian'` errors that look like source problems but are not.
+
+`@types/node` is intentionally held at v22, not v24: it describes the runtime the *plugin* code
+executes in, which is Obsidian's bundled Electron (Node ~20-22), not the build toolchain. The plugin
+only touches `child_process`, `fs`, `path` and `util`, so the surface is stable either way.
+
 ## Building
 
 - **Plugin**: `npm run build` produces `main.js` in the project root.
