@@ -1,6 +1,6 @@
 {
   "name": "obsidian-apple-eventkit-plugin",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "engines": {
     "node": ">=24"
   },
