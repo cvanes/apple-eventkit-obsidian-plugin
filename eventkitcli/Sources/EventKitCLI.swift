@@ -15,9 +15,12 @@ struct EventKitCLI: ParsableCommand {
             UpdateEvent.self,
             DeleteEvent.self,
             ListReminderLists.self,
+            CreateReminderList.self,
             ListReminders.self,
             GetReminder.self,
             CreateReminder.self,
+            CreateRemindersBatch.self,
+            UpdateReminder.self,
             CompleteReminder.self,
             DeleteReminder.self,
         ]

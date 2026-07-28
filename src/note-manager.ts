@@ -2,20 +2,55 @@ import { App, Notice, TFile, normalizePath } from "obsidian";
 import { BridgeEvent, PluginSettings } from "./types";
 import { formatNoteDate } from "./date-utils";
 
-export function findNoteForEvent(app: App, eventId: string): TFile | null {
+/**
+ * Maps `event-id|event-date` to the note holding it.
+ *
+ * Built once per refresh: scanning the vault per event was O(events x files),
+ * which is heavy on a large vault and ran on every navigation and every
+ * five-minute auto-refresh.
+ *
+ * Recurring events share one `calendarItemIdentifier` across every occurrence,
+ * so the date is part of the key -- keying on id alone made next week's
+ * occurrence of a weekly meeting open last week's note.
+ */
+export type EventNoteIndex = Map<string, TFile>;
+
+export function noteKey(eventId: string, eventDate: string): string {
+  return `${eventId}|${eventDate}`;
+}
+
+export function buildEventNoteIndex(app: App): EventNoteIndex {
+  const index: EventNoteIndex = new Map();
   for (const file of app.vault.getMarkdownFiles()) {
-    const cache = app.metadataCache.getFileCache(file);
-    if (cache?.frontmatter?.["event-id"] === eventId) return file;
+    const fm = app.metadataCache.getFileCache(file)?.frontmatter;
+    const id = fm?.["event-id"];
+    if (!id) continue;
+    const date = String(fm?.["event-date"] ?? "");
+    index.set(noteKey(id, date), file);
+    // Fallback for notes written before dates were part of the key.
+    if (!index.has(id)) index.set(id, file);
   }
-  return null;
+  return index;
+}
+
+export function findNoteForEvent(
+  app: App,
+  event: BridgeEvent,
+  index?: EventNoteIndex
+): TFile | null {
+  const idx = index ?? buildEventNoteIndex(app);
+  return (
+    idx.get(noteKey(event.id, eventDateString(event))) ?? idx.get(event.id) ?? null
+  );
 }
 
 export async function createOrOpenEventNote(
   app: App,
   event: BridgeEvent,
-  settings: PluginSettings
+  settings: PluginSettings,
+  index?: EventNoteIndex
 ): Promise<void> {
-  const existing = findNoteForEvent(app, event.id);
+  const existing = findNoteForEvent(app, event, index);
   if (existing) {
     await app.workspace.openLinkText(existing.path, "", false);
     return;
@@ -52,9 +87,10 @@ export async function unlinkNoteFromEvent(app: App): Promise<void> {
 
 export async function syncNoteWithEvent(
   app: App,
-  event: BridgeEvent
+  event: BridgeEvent,
+  index?: EventNoteIndex
 ): Promise<void> {
-  const file = findNoteForEvent(app, event.id);
+  const file = findNoteForEvent(app, event, index);
   if (!file) return;
   await updateFrontmatterIfNeeded(app, file, event);
 }
@@ -67,6 +103,15 @@ async function createEventNote(
   const fullPath = buildNotePath(event, settings);
   const folder = fullPath.substring(0, fullPath.lastIndexOf("/"));
   if (folder) await ensureFolder(app, folder);
+
+  // A note may already sit at this path without being linked -- adopt it rather
+  // than throwing, which is what vault.create does on a duplicate path.
+  const atPath = app.vault.getAbstractFileByPath(fullPath);
+  if (atPath instanceof TFile) {
+    await updateFrontmatterIfNeeded(app, atPath, event);
+    new Notice(`Linked existing note: ${atPath.basename}`);
+    return atPath;
+  }
 
   const frontmatter = buildFrontmatter(event);
   const templateContent = await readTemplate(app, settings.templateFilePath);
@@ -111,7 +156,7 @@ export function buildFrontmatter(event: BridgeEvent): string {
   return `event-id: "${event.id}"\nevent-date: ${date}\n`;
 }
 
-function eventDateString(event: BridgeEvent): string {
+export function eventDateString(event: BridgeEvent): string {
   return new Date(event.startDate).toISOString().slice(0, 10);
 }
 

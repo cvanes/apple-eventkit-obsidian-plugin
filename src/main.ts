@@ -158,8 +158,29 @@ export default class AppleCalendarPlugin extends Plugin {
       this.app,
       selection,
       this.settings,
-      this.resolveBridgePath()
+      this.resolveBridgePath(),
+      this.buildNoteDeepLink()
     ).open();
+  }
+
+  /**
+   * obsidian:// link to the active note, so a reminder created from a selection
+   * carries a way back to its context. Stored in the reminder's URL field, which
+   * Reminders renders as a tappable link.
+   */
+  private buildNoteDeepLink(): string | undefined {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) return undefined;
+    const vault = encodeURIComponent(this.app.vault.getName());
+    const path = encodeURIComponent(file.path.replace(/\.md$/, ""));
+    return `obsidian://open?vault=${vault}&file=${path}`;
+  }
+
+  /** Re-render every open agenda leaf, e.g. after a settings change. */
+  async refreshAgendaViews(): Promise<void> {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_AGENDA)) {
+      if (leaf.view instanceof AgendaView) await leaf.view.refresh();
+    }
   }
 
   private async reloadCalendars(): Promise<void> {

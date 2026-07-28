@@ -1,8 +1,15 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import type AppleCalendarPlugin from "./main";
-import { BridgeEvent } from "./types";
-import { fetchEvents } from "./bridge";
-import { createOrOpenEventNote, syncNoteWithEvent, findNoteForEvent } from "./note-manager";
+import { BridgeEvent, BridgeReminder } from "./types";
+import { fetchEvents, fetchReminders, completeReminder } from "./bridge";
+import {
+  createOrOpenEventNote,
+  syncNoteWithEvent,
+  buildEventNoteIndex,
+  noteKey,
+  eventDateString,
+  type EventNoteIndex,
+} from "./note-manager";
 import {
   formatDateForDisplay,
   formatDateForCli,
@@ -16,6 +23,7 @@ import {
   renderEmptyState,
   renderLoading,
   renderError,
+  renderReminderList,
 } from "./agenda-renderer";
 
 export const VIEW_TYPE_AGENDA = "apple-eventkit-agenda";
@@ -24,6 +32,8 @@ export class AgendaView extends ItemView {
   plugin: AppleCalendarPlugin;
   currentDate: Date = startOfDay(new Date());
   events: BridgeEvent[] = [];
+  private noteIndex: EventNoteIndex = new Map();
+  reminders: BridgeReminder[] = [];
 
   constructor(leaf: WorkspaceLeaf, plugin: AppleCalendarPlugin) {
     super(leaf);
@@ -67,6 +77,8 @@ export class AgendaView extends ItemView {
 
     try {
       this.events = await this.loadEvents();
+      this.reminders = await this.loadReminders();
+      this.noteIndex = buildEventNoteIndex(this.app);
       await this.syncLinkedNotes();
       this.renderContent(container, callbacks);
     } catch (e) {
@@ -81,13 +93,43 @@ export class AgendaView extends ItemView {
   ): void {
     container.querySelector(".apple-eventkit-loading")?.remove();
 
-    if (this.events.length === 0) {
+    if (this.events.length === 0 && this.reminders.length === 0) {
       renderEmptyState(container);
       return;
     }
 
     const noteEventIds = this.findLinkedEventIds();
     renderEventList(container, this.events, noteEventIds, callbacks);
+    renderReminderList(container, this.reminders, callbacks);
+  }
+
+  /**
+   * Reminders due on the selected day. Returns nothing when the setting is off,
+   * so the extra CLI call only happens for users who asked for it.
+   */
+  private async loadReminders(): Promise<BridgeReminder[]> {
+    if (!this.plugin.settings.showRemindersInAgenda) return [];
+    const lists = this.plugin.settings.agendaReminderLists;
+    const day = formatDateForCli(this.currentDate);
+    const nextDay = formatDateForCli(addDays(this.currentDate, 1));
+    try {
+      const requested = lists.length > 0 ? lists : [undefined];
+      const batches = await Promise.all(
+        requested.map((list) =>
+          fetchReminders(this.plugin.resolveBridgePath(), {
+            list,
+            incompleteOnly: true,
+            dueBefore: `${nextDay}T00:00:00Z`,
+          })
+        )
+      );
+      // dueBefore is an upper bound only, so drop anything before the day itself.
+      return batches.flat().filter((r) => (r.dueDate ?? "") >= day);
+    } catch (e) {
+      // A reminders failure should not blank out the agenda.
+      console.error("Failed to load reminders", e);
+      return [];
+    }
   }
 
   private async loadEvents(): Promise<BridgeEvent[]> {
@@ -113,19 +155,18 @@ export class AgendaView extends ItemView {
 
   private async syncLinkedNotes(): Promise<void> {
     for (const event of this.events) {
-      if (findNoteForEvent(this.app, event.id)) {
-        await syncNoteWithEvent(this.app, event);
-      }
+      await syncNoteWithEvent(this.app, event, this.noteIndex);
     }
   }
 
+  /** Event ids that already have a note, for the current day's events only. */
   findLinkedEventIds(): Set<string> {
     const ids = new Set<string>();
-    const files = this.app.vault.getMarkdownFiles();
-    for (const file of files) {
-      const cache = this.app.metadataCache.getFileCache(file);
-      const eventId = cache?.frontmatter?.["event-id"];
-      if (eventId) ids.add(eventId);
+    for (const event of this.events) {
+      const hasNote =
+        this.noteIndex.has(noteKey(event.id, eventDateString(event))) ||
+        this.noteIndex.has(event.id);
+      if (hasNote) ids.add(event.id);
     }
     return ids;
   }
@@ -138,6 +179,8 @@ export class AgendaView extends ItemView {
       onReload: () => this.refresh(),
       onDatePick: (date) => this.goToDate(date),
       onEventClick: (event) => this.handleEventClick(event),
+      onReminderToggle: (reminder) => this.handleReminderToggle(reminder),
+      onReminderOpen: (reminder) => this.handleReminderOpen(reminder),
     };
   }
 
@@ -160,8 +203,21 @@ export class AgendaView extends ItemView {
     await this.refresh();
   }
 
+  private async handleReminderToggle(reminder: BridgeReminder): Promise<void> {
+    try {
+      await completeReminder(this.plugin.resolveBridgePath(), reminder.id);
+      await this.refresh();
+    } catch (e) {
+      renderError(this.contentEl, `Failed to complete reminder: ${e}`);
+    }
+  }
+
+  private handleReminderOpen(reminder: BridgeReminder): void {
+    if (reminder.url) window.open(reminder.url);
+  }
+
   private async handleEventClick(event: BridgeEvent): Promise<void> {
-    await createOrOpenEventNote(this.app, event, this.plugin.settings);
+    await createOrOpenEventNote(this.app, event, this.plugin.settings, this.noteIndex);
     await this.refresh();
   }
 }

@@ -174,6 +174,37 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Show reminders in agenda")
+      .setDesc(
+        "List reminders due on the selected day underneath that day's events, with a checkbox to complete them."
+      )
+      .addToggle((t: any) =>
+        t.setValue(this.plugin.settings.showRemindersInAgenda).onChange(async (value: boolean) => {
+          this.plugin.settings.showRemindersInAgenda = value;
+          await this.plugin.saveSettings();
+          await this.plugin.refreshAgendaViews();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Agenda reminder lists")
+      .setDesc(
+        "Comma-separated list titles to include, e.g. Work, Personal. Leave empty for all lists."
+      )
+      .addText((t: any) =>
+        t
+          .setPlaceholder("all lists")
+          .setValue(this.plugin.settings.agendaReminderLists.join(", "))
+          .onChange(async (value: string) => {
+            this.plugin.settings.agendaReminderLists = value
+              .split(",")
+              .map((s: string) => s.trim())
+              .filter((s: string) => s.length > 0);
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Hide all day events in calendar modals")
       .setDesc("Filter out all day events from event picker modals.")
       .addToggle((t) =>

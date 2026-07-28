@@ -33,11 +33,18 @@ Use **Unlink note from calendar event** to remove the event frontmatter from the
 
 From any linked note, run **Open event in Calendar** to switch to Apple Calendar and navigate to the event's date.
 
+### Reminders in the agenda
+
+Enable **Show reminders in agenda** in settings to list reminders due on the selected day underneath that
+day's events, each with a checkbox that completes it in place. Restrict which lists appear with
+**Agenda reminder lists** (comma-separated titles; empty means all). Reminders created from a note show a
+↗ that opens the source note again.
+
 ### Reminders
 
 Select text in any note and run **Create reminder from selection** (also available via the right-click context menu). A modal lets you pick a reminder list, edit the title and set a due date using natural language (e.g. "tomorrow", "next Monday at 9am").
 
-After creation the selected text is replaced with a clickable link to the reminder in Apple Reminders.
+After creation the selected text is replaced with a clickable link to the reminder in Apple Reminders. The reminder also stores an `obsidian://` link back to the source note in its URL field, which Reminders renders as a tappable link on iPhone.
 
 ## Commands
 

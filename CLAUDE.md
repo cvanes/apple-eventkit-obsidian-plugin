@@ -21,12 +21,40 @@ The plugin has two parts:
 - Event notes are linked to calendar events via `event-id` in frontmatter. Note lookup scans `app.metadataCache`.
 - Settings support moment.js date tokens in `noteFolderPath` (e.g. `YYYY/MM`). Empty path means vault root.
 
+## Reminder list resolution
+
+`--list` accepts either a list title or an identifier, resolved by `EventKitManager.resolveReminderList`.
+Titles are matched case-insensitively and an ambiguous title is an error rather than a silent pick.
+This keeps scripts and agents free of UUIDs.
+
+## All-day due dates
+
+`EKReminder` has no `isAllDay`, so it is inferred from `dueDateComponents` having no hour or minute.
+All-day reminders report `dueDate` as `YYYY-MM-DD` and timed ones as ISO 8601, with `isAllDay` alongside.
+Reporting a UTC instant for an all-day reminder shifts the apparent day either side of midnight.
+
+Swift's synthesised `Codable` omits nil optionals, so `dueDate` and `url` may be **absent** rather than
+null. The TypeScript types mark them optional to match.
+
+## Out of scope: private API features
+
+RemCTL supports Reminders features that EventKit does not expose publicly — subtasks, tags, sections,
+templates and smart lists — by using the private `ReminderKit` framework. This CLI deliberately stays on
+public EventKit, so those are unavailable. Import paths that carry them (e.g. TickTick subtasks) flatten
+them into the notes field instead.
+
 ## Testing the CLI standalone
 
 ```sh
 eventkitcli list-calendars
 eventkitcli list-events --from 2026-02-14 --to 2026-02-14
 eventkitcli list-reminder-lists
+eventkitcli create-reminder-list --title Holiday          # idempotent
+eventkitcli list-reminders --incomplete-only              # across all lists
+eventkitcli list-reminders --list Work --due-before 2026-08-01T00:00:00Z
+eventkitcli create-reminder --list Work --title "Review draft" --url "obsidian://open?vault=v&file=Note"
+eventkitcli update-reminder --id ID --clear-due
+echo '[{"list":"Work","title":"Batch one"}]' | eventkitcli create-reminders   # single commit
 eventkitcli --help
 ```
 

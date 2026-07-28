@@ -7,6 +7,8 @@ export class CreateReminderModal extends Modal {
   title: string;
   settings: PluginSettings;
   bridgePath: string;
+  /** obsidian:// deep link back to the note the selection came from. */
+  sourceUrl?: string;
 
   private selectedListId = "";
   private dueDateInput = "";
@@ -16,12 +18,14 @@ export class CreateReminderModal extends Modal {
     app: App,
     title: string,
     settings: PluginSettings,
-    bridgePath: string
+    bridgePath: string,
+    sourceUrl?: string
   ) {
     super(app);
     this.title = title;
     this.settings = settings;
     this.bridgePath = bridgePath;
+    this.sourceUrl = sourceUrl;
     this.selectedListId = settings.defaultReminderList;
   }
 
@@ -101,7 +105,7 @@ export class CreateReminderModal extends Modal {
         this.bridgePath,
         this.selectedListId,
         this.title,
-        dueIso
+        { dueDate: dueIso, url: this.sourceUrl }
       );
       new Notice(`Reminder created: ${reminder.title}`);
       this.close();

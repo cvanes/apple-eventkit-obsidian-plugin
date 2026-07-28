@@ -98,20 +98,58 @@ class EventKitManager {
         store.calendars(for: .reminder).map { reminderListInfo($0) }
     }
 
+    /// Resolves a reminder list by identifier first, then by case-insensitive title.
+    /// Lets callers and agents say `--list Work` instead of carrying a UUID around.
+    func resolveReminderList(_ idOrName: String) throws -> EKCalendar {
+        if let byId = store.calendar(withIdentifier: idOrName), byId.allowedEntityTypes.contains(.reminder) {
+            return byId
+        }
+        let lists = store.calendars(for: .reminder)
+        let matches = lists.filter { $0.title.lowercased() == idOrName.lowercased() }
+        if matches.count == 1 { return matches[0] }
+        if matches.count > 1 { throw EventKitError.ambiguousReminderList(idOrName, matches.map { $0.title }) }
+        throw EventKitError.reminderListNotFound(idOrName)
+    }
+
+    func createReminderList(title: String) throws -> ReminderListInfo {
+        let existing = store.calendars(for: .reminder).first { $0.title.lowercased() == title.lowercased() }
+        if let existing { return reminderListInfo(existing) }
+        let cal = EKCalendar(for: .reminder, eventStore: store)
+        cal.title = title
+        // Local sources cannot always hold reminders; prefer the default list's source.
+        cal.source = store.defaultCalendarForNewReminders()?.source
+            ?? store.sources.first { $0.sourceType == .calDAV }
+            ?? store.sources.first { $0.sourceType == .local }
+        try store.saveCalendar(cal, commit: true)
+        return reminderListInfo(cal)
+    }
+
     // MARK: - Reminders
 
-    func listReminders(listId: String, incompleteOnly: Bool) async throws -> [ReminderInfo] {
-        guard let calendar = store.calendar(withIdentifier: listId) else {
-            throw EventKitError.reminderListNotFound(listId)
+    /// Lists reminders. Passing nil for `list` searches every reminder list.
+    func listReminders(list: String?, incompleteOnly: Bool, dueBefore: Date? = nil) async throws -> [ReminderInfo] {
+        let calendars: [EKCalendar]?
+        if let list {
+            calendars = [try resolveReminderList(list)]
+        } else {
+            calendars = nil
         }
-        let predicate = store.predicateForReminders(in: [calendar])
+        let predicate = store.predicateForReminders(in: calendars)
         let reminders = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[EKReminder], Error>) in
             store.fetchReminders(matching: predicate) { result in
                 cont.resume(returning: result ?? [])
             }
         }
-        let mapped = reminders.map { reminderInfo($0) }
-        return incompleteOnly ? mapped.filter { !$0.isCompleted } : mapped
+        var mapped = reminders.map { reminderInfo($0) }
+        if incompleteOnly { mapped = mapped.filter { !$0.isCompleted } }
+        if let dueBefore {
+            let cutoff = isoFormatter.string(from: dueBefore)
+            mapped = mapped.filter { due in
+                guard let d = due.dueDate else { return false }
+                return d < cutoff
+            }
+        }
+        return mapped.sorted { ($0.dueDate ?? "9999") < ($1.dueDate ?? "9999") }
     }
 
     func getReminder(id: String) -> ReminderInfo? {
@@ -120,15 +158,39 @@ class EventKitManager {
     }
 
     func createReminder(
-        listId: String, title: String, dueDate: Date?, notes: String?, priority: Int?
+        list: String, title: String, dueDate: Date?, notes: String?, priority: Int?,
+        url: String? = nil, allDay: Bool = false, commit: Bool = true
     ) throws -> ReminderInfo {
         let reminder = EKReminder(eventStore: store)
         reminder.title = title
         reminder.notes = notes
         reminder.priority = priority ?? 0
-        reminder.calendar = store.calendar(withIdentifier: listId)
-            ?? store.defaultCalendarForNewReminders()
+        reminder.calendar = try resolveReminderList(list)
+        if let url, let parsed = URL(string: url) { reminder.url = parsed }
         if let dueDate {
+            let fields: Set<Calendar.Component> = allDay
+                ? [.year, .month, .day]
+                : [.year, .month, .day, .hour, .minute]
+            reminder.dueDateComponents = Calendar.current.dateComponents(fields, from: dueDate)
+        }
+        try store.save(reminder, commit: commit)
+        return reminderInfo(reminder)
+    }
+
+    func updateReminder(
+        id: String, title: String?, dueDate: Date?, notes: String?,
+        priority: Int?, url: String?, clearDue: Bool
+    ) throws -> ReminderInfo {
+        guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
+            throw EventKitError.reminderNotFound(id)
+        }
+        if let title { reminder.title = title }
+        if let notes { reminder.notes = notes }
+        if let priority { reminder.priority = priority }
+        if let url, let parsed = URL(string: url) { reminder.url = parsed }
+        if clearDue {
+            reminder.dueDateComponents = nil
+        } else if let dueDate {
             reminder.dueDateComponents = Calendar.current.dateComponents(
                 [.year, .month, .day, .hour, .minute], from: dueDate
             )
@@ -136,6 +198,8 @@ class EventKitManager {
         try store.save(reminder, commit: true)
         return reminderInfo(reminder)
     }
+
+    func commitChanges() throws { try store.commit() }
 
     func completeReminder(id: String) throws -> ReminderInfo {
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
@@ -185,16 +249,25 @@ class EventKitManager {
 
     private func reminderInfo(_ reminder: EKReminder) -> ReminderInfo {
         var dueDateStr: String? = nil
+        var isAllDay = false
         if let comps = reminder.dueDateComponents, let date = Calendar.current.date(from: comps) {
-            dueDateStr = isoFormatter.string(from: date)
+            // No time component means an all-day reminder. Emitting a UTC instant
+            // for those shifts the apparent day either side of midnight, so emit a
+            // plain date instead.
+            isAllDay = comps.hour == nil && comps.minute == nil
+            dueDateStr = isAllDay
+                ? dateOnlyFormatter.string(from: date)
+                : isoFormatter.string(from: date)
         }
         return ReminderInfo(
             id: reminder.calendarItemIdentifier,
             title: reminder.title ?? "",
             notes: reminder.notes ?? "",
             dueDate: dueDateStr,
+            isAllDay: isAllDay,
             isCompleted: reminder.isCompleted,
             priority: reminder.priority,
+            url: reminder.url?.absoluteString,
             listId: reminder.calendar.calendarIdentifier,
             listTitle: reminder.calendar.title
         )
@@ -229,12 +302,15 @@ enum EventKitError: LocalizedError {
     case eventNotFound(String)
     case reminderNotFound(String)
     case reminderListNotFound(String)
+    case ambiguousReminderList(String, [String])
 
     var errorDescription: String? {
         switch self {
         case .eventNotFound(let id): return "Event not found: \(id)"
         case .reminderNotFound(let id): return "Reminder not found: \(id)"
         case .reminderListNotFound(let id): return "Reminder list not found: \(id)"
+        case .ambiguousReminderList(let name, let titles):
+            return "Reminder list name '\(name)' matches \(titles.count) lists: \(titles.joined(separator: ", ")). Use the list id instead."
         }
     }
 }

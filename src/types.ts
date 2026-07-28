@@ -13,6 +13,10 @@ export interface PluginSettings {
   defaultReminderList: string;
   hideAllDayInAgenda: boolean;
   hideAllDayInModals: boolean;
+  /** Show reminders due on the selected day alongside events in the agenda. */
+  showRemindersInAgenda: boolean;
+  /** Restrict agenda reminders to these list titles. Empty means all lists. */
+  agendaReminderLists: string[];
   calendarToggles: CalendarToggle[];
   bridgePath: string;
 }
@@ -24,6 +28,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   defaultReminderList: "",
   hideAllDayInAgenda: false,
   hideAllDayInModals: false,
+  showRemindersInAgenda: false,
+  agendaReminderLists: [],
   calendarToggles: [],
   bridgePath: "",
 };
@@ -58,9 +64,13 @@ export interface BridgeReminder {
   id: string;
   title: string;
   notes: string;
-  dueDate: string | null;
+  /** Absent when unset. All-day reminders return `YYYY-MM-DD`, timed ones ISO 8601. */
+  dueDate?: string;
+  isAllDay: boolean;
   isCompleted: boolean;
   priority: number;
+  /** Absent when unset. */
+  url?: string;
   listId: string;
   listTitle: string;
 }

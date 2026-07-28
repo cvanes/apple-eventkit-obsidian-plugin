@@ -31,8 +31,10 @@ struct ReminderInfo: Codable {
     let title: String
     let notes: String
     let dueDate: String?
+    let isAllDay: Bool
     let isCompleted: Bool
     let priority: Int
+    let url: String?
     let listId: String
     let listTitle: String
 }

@@ -1,4 +1,4 @@
-import { BridgeEvent } from "./types";
+import { BridgeEvent, BridgeReminder } from "./types";
 import { formatTime } from "./date-utils";
 
 export interface AgendaCallbacks {
@@ -8,6 +8,8 @@ export interface AgendaCallbacks {
   onReload: () => void;
   onDatePick: (date: string) => void;
   onEventClick: (event: BridgeEvent) => void;
+  onReminderToggle: (reminder: BridgeReminder) => void;
+  onReminderOpen: (reminder: BridgeReminder) => void;
 }
 
 export function renderHeader(
@@ -98,9 +100,64 @@ function renderEventRow(
   info.createEl("span", { text: event.title, cls: titleCls });
 }
 
+/**
+ * Reminders due on the selected day, rendered under the events with a checkbox
+ * so they can be completed without leaving Obsidian.
+ */
+export function renderReminderList(
+  container: HTMLElement,
+  reminders: BridgeReminder[],
+  callbacks: AgendaCallbacks
+): void {
+  if (reminders.length === 0) return;
+
+  const section = container.createDiv({ cls: "apple-eventkit-reminders" });
+  section.createEl("div", {
+    text: "Reminders",
+    cls: "apple-eventkit-section-heading",
+  });
+
+  for (const reminder of reminders) {
+    const row = section.createDiv({ cls: "apple-eventkit-reminder-row" });
+
+    const box = row.createEl("input", {
+      cls: "apple-eventkit-reminder-check",
+      type: "checkbox",
+    });
+    box.checked = reminder.isCompleted;
+    box.addEventListener("click", (e) => {
+      e.stopPropagation();
+      callbacks.onReminderToggle(reminder);
+    });
+
+    const info = row.createDiv({ cls: "apple-eventkit-reminder-info" });
+    info.createEl("span", {
+      text: reminder.listTitle,
+      cls: "apple-eventkit-reminder-list",
+    });
+    info.createEl("span", {
+      text: reminder.title,
+      cls: "apple-eventkit-reminder-title",
+    });
+
+    // A reminder created from a note carries an obsidian:// link back to it.
+    if (reminder.url) {
+      const link = row.createEl("span", {
+        text: "\u2197",
+        cls: "apple-eventkit-reminder-link",
+        attr: { "aria-label": "Open source note" },
+      });
+      link.addEventListener("click", (e) => {
+        e.stopPropagation();
+        callbacks.onReminderOpen(reminder);
+      });
+    }
+  }
+}
+
 export function renderEmptyState(container: HTMLElement): void {
   container.createDiv({
-    text: "No events for this day.",
+    text: "Nothing scheduled for this day.",
     cls: "apple-eventkit-empty",
   });
 }
