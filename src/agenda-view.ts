@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import type AppleCalendarPlugin from "./main";
 import { BridgeEvent, BridgeReminder } from "./types";
-import { fetchEvents, fetchReminders, completeReminder } from "./bridge";
+import { fetchEvents, fetchReminders } from "./bridge";
 import {
   createOrOpenEventNote,
   syncNoteWithEvent,
@@ -210,8 +210,8 @@ export class AgendaView extends ItemView {
       onReload: () => this.refresh(),
       onDatePick: (date) => this.goToDate(date),
       onEventClick: (event) => this.handleEventClick(event),
-      onReminderToggle: (reminder) => this.handleReminderToggle(reminder),
-      onReminderOpen: (reminder) => this.handleReminderOpen(reminder),
+      onReminderClick: (reminder) => this.plugin.openReminderInApp(reminder),
+      onReminderOpenNote: (reminder) => this.handleReminderOpenNote(reminder),
     };
   }
 
@@ -236,16 +236,7 @@ export class AgendaView extends ItemView {
     await this.refresh();
   }
 
-  private async handleReminderToggle(reminder: BridgeReminder): Promise<void> {
-    try {
-      await completeReminder(this.plugin.resolveBridgePath(), reminder.id);
-      await this.refresh();
-    } catch (e) {
-      renderError(this.contentEl, `Failed to complete reminder: ${e}`);
-    }
-  }
-
-  private handleReminderOpen(reminder: BridgeReminder): void {
+  private handleReminderOpenNote(reminder: BridgeReminder): void {
     if (reminder.url) window.open(reminder.url);
   }
 

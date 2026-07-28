@@ -261,6 +261,7 @@ class EventKitManager {
         }
         return ReminderInfo(
             id: reminder.calendarItemIdentifier,
+            externalId: reminder.calendarItemExternalIdentifier,
             title: reminder.title ?? "",
             notes: reminder.notes ?? "",
             dueDate: dueDateStr,

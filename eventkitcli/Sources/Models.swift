@@ -28,6 +28,7 @@ struct ReminderListInfo: Codable {
 
 struct ReminderInfo: Codable {
     let id: String
+    let externalId: String?
     let title: String
     let notes: String
     let dueDate: String?

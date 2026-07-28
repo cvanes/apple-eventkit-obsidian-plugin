@@ -37,11 +37,11 @@ From any linked note, run **Open event in Calendar** to switch to Apple Calendar
 
 Enable **Show reminders in agenda** in settings to see reminders due on the selected day *interleaved with
 that day's events*, the way Apple Calendar does it: all-day items first, then everything else in time
-order. Each reminder shows a coloured dot taken from its Reminders list, its due time and list name, and a
-checkbox that completes it in place. Overdue reminders are dimmed like past events.
+order. Each reminder shows a coloured dot taken from its Reminders list, its due time and list name. Overdue
+reminders are dimmed like past events. Clicking one opens it in Reminders.app; reminders created from a
+note also show a ↗ that opens the source note instead.
 
 Restrict which lists appear with **Agenda reminder lists** (comma-separated titles; empty means all).
-Reminders created from a note show a ↗ that opens the source note again.
 
 ### Reminders
 

@@ -62,6 +62,12 @@ export interface BridgeReminderList {
 
 export interface BridgeReminder {
   id: string;
+  /**
+   * Reminders' own identifier, distinct from `id` (EventKit's
+   * calendarItemIdentifier). Needed to deep-link into Reminders.app, which only
+   * recognises this one. Absent for some store types.
+   */
+  externalId?: string;
   title: string;
   notes: string;
   /** Absent when unset. All-day reminders return `YYYY-MM-DD`, timed ones ISO 8601. */

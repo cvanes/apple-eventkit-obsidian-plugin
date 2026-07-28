@@ -8,8 +8,10 @@ export interface AgendaCallbacks {
   onReload: () => void;
   onDatePick: (date: string) => void;
   onEventClick: (event: BridgeEvent) => void;
-  onReminderToggle: (reminder: BridgeReminder) => void;
-  onReminderOpen: (reminder: BridgeReminder) => void;
+  /** Open the reminder in Reminders.app. */
+  onReminderClick: (reminder: BridgeReminder) => void;
+  /** Open the note the reminder was created from, if it has one. */
+  onReminderOpenNote: (reminder: BridgeReminder) => void;
 }
 
 export function renderHeader(
@@ -155,15 +157,7 @@ function renderReminderRow(
       : "apple-eventkit-event-row apple-eventkit-reminder-row",
   });
 
-  const box = row.createEl("input", {
-    cls: "apple-eventkit-reminder-check",
-    type: "checkbox",
-  });
-  box.checked = reminder.isCompleted;
-  box.addEventListener("click", (e) => {
-    e.stopPropagation();
-    callbacks.onReminderToggle(reminder);
-  });
+  row.addEventListener("click", () => callbacks.onReminderClick(reminder));
 
   const dot = row.createEl("span", { cls: "apple-eventkit-dot" });
   dot.style.backgroundColor = reminder.listColor;
@@ -187,7 +181,7 @@ function renderReminderRow(
     });
     link.addEventListener("click", (e) => {
       e.stopPropagation();
-      callbacks.onReminderOpen(reminder);
+      callbacks.onReminderOpenNote(reminder);
     });
   }
 }

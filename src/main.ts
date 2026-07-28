@@ -2,7 +2,7 @@ import { Editor, Notice, Plugin } from "obsidian";
 import { chmodSync } from "fs";
 import { execFile } from "child_process";
 import { join } from "path";
-import { BridgeEvent, DEFAULT_SETTINGS, PluginSettings } from "./types";
+import { BridgeEvent, DEFAULT_SETTINGS, PluginSettings, BridgeReminder } from "./types";
 import { AppleCalendarSettingTab } from "./settings";
 import { AgendaView, VIEW_TYPE_AGENDA } from "./agenda-view";
 import { fetchEvents } from "./bridge";
@@ -200,6 +200,33 @@ export default class AppleCalendarPlugin extends Plugin {
     if (!file) return null;
     const cache = this.app.metadataCache.getFileCache(file);
     return cache?.frontmatter?.["event-date"] ?? null;
+  }
+
+  /**
+   * Reveal a reminder in Reminders.app.
+   *
+   * There is no usable URL scheme: `x-apple-reminder://` is not registered with
+   * Launch Services, so `open` fails with kLSApplicationNotFoundErr. AppleScript
+   * does resolve that identifier though, so `show reminder id` is the route --
+   * the same osascript approach already used for Calendar.
+   *
+   * It must be the *external* identifier: Reminders does not recognise
+   * EventKit's calendarItemIdentifier.
+   */
+  openReminderInApp(reminder: BridgeReminder): void {
+    if (!reminder.externalId) {
+      new Notice("This reminder cannot be opened in Reminders.");
+      return;
+    }
+    const script = [
+      'tell application "Reminders"',
+      "activate",
+      `show reminder id "x-apple-reminder://${reminder.externalId}"`,
+      "end tell",
+    ].join("\n");
+    execFile("osascript", ["-e", script], (err) => {
+      if (err) new Notice(`Failed to open Reminders: ${err.message}`);
+    });
   }
 
   private openDateInCalendar(dateStr: string): void {

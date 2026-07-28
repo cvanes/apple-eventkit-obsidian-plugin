@@ -141,12 +141,9 @@
 /* Reminders rendered inline in the agenda, alongside events */
 .apple-eventkit-reminder-row {
   align-items: center;
+  cursor: pointer;
 }
 
-.apple-eventkit-reminder-check {
-  margin: 0 0.15em 0 0;
-  flex-shrink: 0;
-}
 
 .apple-eventkit-reminder-link {
   cursor: pointer;
