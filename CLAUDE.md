@@ -9,6 +9,19 @@ The plugin has two parts:
 1. **`eventkitcli`** — A standalone Swift CLI tool that wraps Apple's EventKit framework. Bundled alongside the plugin in its directory. All commands output JSON to stdout.
 2. **`src/`** — The Obsidian plugin (TypeScript). Calls `eventkitcli` via `child_process.execFile` through a bridge layer (`bridge.ts`).
 
+## The CLI is not installed on PATH
+
+`install.sh` copies `eventkitcli` into the plugin directory only. It is deliberately **not** installed to
+`~/.local/bin`: run from a terminal, TCC attributes its requests to that terminal, so access depends on
+which terminal you happen to be in (see below). Run from Obsidian, attribution is to Obsidian, which holds
+both grants — so the plugin path is the reliable one. To invoke it by hand, use the built or installed
+binary directly:
+
+```sh
+./eventkitcli/.build/eventkitcli --help
+"$HOME/second-brain/.obsidian/plugins/apple-eventkit-obsidian-plugin/eventkitcli" --help
+```
+
 ## Toolchain
 
 Node is pinned to 24.8.0 in `.node-version` (nodenv/fnm/asdf all read it) and enforced by
@@ -93,18 +106,25 @@ them into the notes field instead.
 
 ## Testing the CLI standalone
 
+Alias the built binary first, since it is not on PATH:
+
 ```sh
-eventkitcli list-calendars
-eventkitcli list-events --from 2026-02-14 --to 2026-02-14
-eventkitcli list-reminder-lists
-eventkitcli create-reminder-list --title Holiday          # idempotent
-eventkitcli list-reminders --incomplete-only              # across all lists
-eventkitcli list-reminders --list Work --due-before 2026-08-01T00:00:00Z
-eventkitcli create-reminder --list Work --title "Review draft" --url "obsidian://open?vault=v&file=Note"
-eventkitcli update-reminder --id ID --clear-due
-echo '[{"list":"Work","title":"Batch one"}]' | eventkitcli create-reminders   # single commit
-eventkitcli --help
+alias ekc=./eventkitcli/.build/eventkitcli
+
+ekc list-calendars
+ekc list-events --from 2026-02-14 --to 2026-02-14
+ekc list-reminder-lists
+ekc create-reminder-list --title Holiday          # idempotent
+ekc list-reminders --incomplete-only              # across all lists
+ekc list-reminders --list Work --due-before 2026-08-01T00:00:00Z
+ekc create-reminder --list Work --title "Review draft" --url "obsidian://open?vault=v&file=Note"
+ekc update-reminder --id ID --clear-due
+echo '[{"list":"Work","title":"Batch one"}]' | ekc create-reminders   # single commit
+ekc --help
 ```
+
+Calendar commands need a terminal that holds the Calendars grant. Reminders commands are more widely
+granted. If either is denied, the error names the launching app.
 
 ## Testing the plugin
 
