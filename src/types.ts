@@ -73,6 +73,7 @@ export interface BridgeReminder {
   url?: string;
   listId: string;
   listTitle: string;
+  listColor: string;
 }
 
 export interface BridgeResponse<T> {

@@ -269,7 +269,8 @@ class EventKitManager {
             priority: reminder.priority,
             url: reminder.url?.absoluteString,
             listId: reminder.calendar.calendarIdentifier,
-            listTitle: reminder.calendar.title
+            listTitle: reminder.calendar.title,
+            listColor: hexColor(reminder.calendar.cgColor)
         )
     }
 

@@ -37,4 +37,5 @@ struct ReminderInfo: Codable {
     let url: String?
     let listId: String
     let listTitle: String
+    let listColor: String
 }

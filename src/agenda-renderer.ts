@@ -54,18 +54,55 @@ export function renderHeader(
   });
 }
 
-export function renderEventList(
+/**
+ * A single row in the agenda: either a calendar event or a reminder due that day.
+ * Apple Calendar interleaves the two rather than separating them, so we do the
+ * same -- all-day items first, then everything else in time order.
+ */
+export type AgendaItem =
+  | { kind: "event"; event: BridgeEvent }
+  | { kind: "reminder"; reminder: BridgeReminder };
+
+/** All-day reminders carry a date-only `dueDate`, timed ones a full ISO string. */
+function reminderIsAllDay(reminder: BridgeReminder): boolean {
+  return reminder.isAllDay || !(reminder.dueDate ?? "").includes("T");
+}
+
+function itemIsAllDay(item: AgendaItem): boolean {
+  return item.kind === "event"
+    ? item.event.isAllDay
+    : reminderIsAllDay(item.reminder);
+}
+
+/** Sort key within the timed group: the event start, or the reminder due time. */
+function itemTime(item: AgendaItem): number {
+  const iso =
+    item.kind === "event" ? item.event.startDate : item.reminder.dueDate ?? "";
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? Number.MAX_SAFE_INTEGER : ms;
+}
+
+export function sortAgendaItems(items: AgendaItem[]): AgendaItem[] {
+  const allDay = items.filter(itemIsAllDay);
+  const timed = items
+    .filter((i) => !itemIsAllDay(i))
+    .sort((a, b) => itemTime(a) - itemTime(b));
+  return [...allDay, ...timed];
+}
+
+export function renderAgendaList(
   container: HTMLElement,
-  events: BridgeEvent[],
+  items: AgendaItem[],
   noteEventIds: Set<string>,
   callbacks: AgendaCallbacks
 ): void {
   const list = container.createDiv({ cls: "apple-eventkit-events" });
-  const sorted = [...events].sort(
-    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-  );
-  for (const event of sorted) {
-    renderEventRow(list, event, noteEventIds.has(event.id), callbacks);
+  for (const item of sortAgendaItems(items)) {
+    if (item.kind === "event") {
+      renderEventRow(list, item.event, noteEventIds.has(item.event.id), callbacks);
+    } else {
+      renderReminderRow(list, item.reminder, callbacks);
+    }
   }
 }
 
@@ -101,57 +138,57 @@ function renderEventRow(
 }
 
 /**
- * Reminders due on the selected day, rendered under the events with a checkbox
- * so they can be completed without leaving Obsidian.
+ * Reminders render in the same shape as events -- a coloured dot from their list,
+ * a time and a title -- plus a checkbox to complete them in place.
  */
-export function renderReminderList(
+function renderReminderRow(
   container: HTMLElement,
-  reminders: BridgeReminder[],
+  reminder: BridgeReminder,
   callbacks: AgendaCallbacks
 ): void {
-  if (reminders.length === 0) return;
-
-  const section = container.createDiv({ cls: "apple-eventkit-reminders" });
-  section.createEl("div", {
-    text: "Reminders",
-    cls: "apple-eventkit-section-heading",
+  const allDay = reminderIsAllDay(reminder);
+  const overdue =
+    !allDay && !!reminder.dueDate && new Date(reminder.dueDate) < new Date();
+  const row = container.createDiv({
+    cls: overdue
+      ? "apple-eventkit-event-row apple-eventkit-reminder-row apple-eventkit-past"
+      : "apple-eventkit-event-row apple-eventkit-reminder-row",
   });
 
-  for (const reminder of reminders) {
-    const row = section.createDiv({ cls: "apple-eventkit-reminder-row" });
+  const box = row.createEl("input", {
+    cls: "apple-eventkit-reminder-check",
+    type: "checkbox",
+  });
+  box.checked = reminder.isCompleted;
+  box.addEventListener("click", (e) => {
+    e.stopPropagation();
+    callbacks.onReminderToggle(reminder);
+  });
 
-    const box = row.createEl("input", {
-      cls: "apple-eventkit-reminder-check",
-      type: "checkbox",
+  const dot = row.createEl("span", { cls: "apple-eventkit-dot" });
+  dot.style.backgroundColor = reminder.listColor;
+
+  const info = row.createDiv({ cls: "apple-eventkit-event-info" });
+  const timeStr = allDay
+    ? `All day \u00B7 ${reminder.listTitle}`
+    : `${formatTime(reminder.dueDate as string)} \u00B7 ${reminder.listTitle}`;
+  info.createEl("span", { text: timeStr, cls: "apple-eventkit-event-time" });
+  info.createEl("span", {
+    text: reminder.title,
+    cls: "apple-eventkit-event-title",
+  });
+
+  // Reminders created from a note carry an obsidian:// link back to it.
+  if (reminder.url) {
+    const link = row.createEl("span", {
+      text: "\u2197",
+      cls: "apple-eventkit-reminder-link",
+      attr: { "aria-label": "Open source note" },
     });
-    box.checked = reminder.isCompleted;
-    box.addEventListener("click", (e) => {
+    link.addEventListener("click", (e) => {
       e.stopPropagation();
-      callbacks.onReminderToggle(reminder);
+      callbacks.onReminderOpen(reminder);
     });
-
-    const info = row.createDiv({ cls: "apple-eventkit-reminder-info" });
-    info.createEl("span", {
-      text: reminder.listTitle,
-      cls: "apple-eventkit-reminder-list",
-    });
-    info.createEl("span", {
-      text: reminder.title,
-      cls: "apple-eventkit-reminder-title",
-    });
-
-    // A reminder created from a note carries an obsidian:// link back to it.
-    if (reminder.url) {
-      const link = row.createEl("span", {
-        text: "\u2197",
-        cls: "apple-eventkit-reminder-link",
-        attr: { "aria-label": "Open source note" },
-      });
-      link.addEventListener("click", (e) => {
-        e.stopPropagation();
-        callbacks.onReminderOpen(reminder);
-      });
-    }
   }
 }
 

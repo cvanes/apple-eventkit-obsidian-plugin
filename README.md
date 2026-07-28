@@ -8,7 +8,7 @@ Browse your daily agenda in the sidebar, create linked notes for calendar events
 
 ### Agenda view
 
-A sidebar panel showing your events for the selected day. Navigate between days, jump to a specific date or tap "Today" to return to the current day. Past events are greyed out and the view refreshes automatically every five minutes.
+A sidebar panel showing your events for the selected day. Navigate between days, jump to a specific date or tap "Today" to return to the current day. Past events are greyed out. The view refreshes every five minutes, and also whenever the window becomes visible or regains focus -- a timer alone goes stale across sleep. If it is showing today and midnight passes, it rolls onto the new day automatically; if you have navigated to another date deliberately, it stays put.
 
 Clicking an event creates a linked note (or opens an existing one).
 
@@ -35,10 +35,13 @@ From any linked note, run **Open event in Calendar** to switch to Apple Calendar
 
 ### Reminders in the agenda
 
-Enable **Show reminders in agenda** in settings to list reminders due on the selected day underneath that
-day's events, each with a checkbox that completes it in place. Restrict which lists appear with
-**Agenda reminder lists** (comma-separated titles; empty means all). Reminders created from a note show a
-↗ that opens the source note again.
+Enable **Show reminders in agenda** in settings to see reminders due on the selected day *interleaved with
+that day's events*, the way Apple Calendar does it: all-day items first, then everything else in time
+order. Each reminder shows a coloured dot taken from its Reminders list, its due time and list name, and a
+checkbox that completes it in place. Overdue reminders are dimmed like past events.
+
+Restrict which lists appear with **Agenda reminder lists** (comma-separated titles; empty means all).
+Reminders created from a note show a ↗ that opens the source note again.
 
 ### Reminders
 

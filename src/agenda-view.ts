@@ -19,11 +19,11 @@ import {
 import {
   AgendaCallbacks,
   renderHeader,
-  renderEventList,
+  renderAgendaList,
   renderEmptyState,
   renderLoading,
   renderError,
-  renderReminderList,
+  type AgendaItem,
 } from "./agenda-renderer";
 
 export const VIEW_TYPE_AGENDA = "apple-eventkit-agenda";
@@ -54,15 +54,44 @@ export class AgendaView extends ItemView {
 
   private refreshTimer: number | null = null;
 
+  /** The day the view was showing when it last rendered, to detect a rollover. */
+  private renderedForToday = true;
+
   async onOpen(): Promise<void> {
     await this.refresh();
     this.refreshTimer = window.setInterval(() => this.refresh(), 5 * 60_000);
     this.register(() => {
       if (this.refreshTimer) window.clearInterval(this.refreshTimer);
     });
+
+    // A five-minute timer alone leaves the view stale: it does not fire while the
+    // machine is asleep, so reopening the laptop can show yesterday's agenda for
+    // several minutes. Refresh whenever the window regains attention.
+    this.registerDomEvent(document, "visibilitychange", () => {
+      if (document.visibilityState === "visible") void this.refresh();
+    });
+    this.registerDomEvent(window, "focus", () => void this.refresh());
+  }
+
+  /**
+   * Roll the view onto the new day when midnight passes.
+   *
+   * Only applies when the view was already showing today: if the user has
+   * navigated to another date deliberately, leave them there.
+   */
+  private advanceIfDayChanged(): void {
+    if (!this.renderedForToday) return;
+    const today = startOfDay(new Date());
+    if (today.getTime() !== this.currentDate.getTime()) {
+      this.currentDate = today;
+    }
   }
 
   async refresh(): Promise<void> {
+    this.advanceIfDayChanged();
+    this.renderedForToday =
+      this.currentDate.getTime() === startOfDay(new Date()).getTime();
+
     const container = this.contentEl;
     container.empty();
 
@@ -98,9 +127,11 @@ export class AgendaView extends ItemView {
       return;
     }
 
-    const noteEventIds = this.findLinkedEventIds();
-    renderEventList(container, this.events, noteEventIds, callbacks);
-    renderReminderList(container, this.reminders, callbacks);
+    const items: AgendaItem[] = [
+      ...this.events.map((event) => ({ kind: "event" as const, event })),
+      ...this.reminders.map((reminder) => ({ kind: "reminder" as const, reminder })),
+    ];
+    renderAgendaList(container, items, this.findLinkedEventIds(), callbacks);
   }
 
   /**
@@ -186,6 +217,7 @@ export class AgendaView extends ItemView {
 
   private async navigateDay(offset: number): Promise<void> {
     this.currentDate = addDays(this.currentDate, offset);
+    this.renderedForToday = false;
     await this.refresh();
   }
 
@@ -200,6 +232,7 @@ export class AgendaView extends ItemView {
 
   private async goToDate(dateStr: string): Promise<void> {
     this.currentDate = startOfDay(new Date(dateStr + "T00:00:00"));
+    this.renderedForToday = false;
     await this.refresh();
   }
 

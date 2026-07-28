@@ -138,47 +138,22 @@
   color: var(--text-error);
 }
 
-/* Reminders in the agenda */
-.apple-eventkit-section-heading {
-  font-size: var(--font-ui-smaller);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-faint);
-  margin: 1em 0 0.35em;
-}
-
+/* Reminders rendered inline in the agenda, alongside events */
 .apple-eventkit-reminder-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5em;
-  padding: 0.25em 0;
+  align-items: center;
 }
 
 .apple-eventkit-reminder-check {
-  margin: 0;
+  margin: 0 0.15em 0 0;
   flex-shrink: 0;
-}
-
-.apple-eventkit-reminder-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.apple-eventkit-reminder-list {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-faint);
-}
-
-.apple-eventkit-reminder-title {
-  color: var(--text-normal);
 }
 
 .apple-eventkit-reminder-link {
   cursor: pointer;
   color: var(--text-muted);
   flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 0.4em;
 }
 
 .apple-eventkit-reminder-link:hover {

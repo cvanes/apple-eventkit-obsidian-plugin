@@ -28,6 +28,8 @@ only touches `child_process`, `fs`, `path` and `util`, so the surface is stable 
 
 - The bridge layer (`bridge.ts`) is the only file that calls `child_process`. All CLI interaction goes through it.
 - The agenda view separates data/lifecycle (`agenda-view.ts`) from DOM rendering (`agenda-renderer.ts`). Renderer functions are pure — they take a container element and data, and return nothing.
+- Events and reminders render as one interleaved list via `AgendaItem`, sorted by `sortAgendaItems`: all-day items first, then timed items by start/due time. Reminders are distinguished only by a checkbox and a list-coloured dot, matching Apple Calendar.
+- Refresh triggers are the five-minute timer, `visibilitychange` and window `focus`. The timer does not fire across sleep, so the event listeners are what keep the view current. `advanceIfDayChanged` rolls the view onto the new day at midnight, but only while it is still showing today — explicit navigation sets `renderedForToday` false and is respected.
 - Event notes are linked to calendar events via `event-id` in frontmatter. Note lookup scans `app.metadataCache`.
 - Settings support moment.js date tokens in `noteFolderPath` (e.g. `YYYY/MM`). Empty path means vault root.
 
