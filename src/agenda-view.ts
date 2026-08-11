@@ -13,6 +13,8 @@ import {
 import {
   formatDateForDisplay,
   formatDateForCli,
+  formatIsoLocal,
+  dueDay,
   addDays,
   startOfDay,
 } from "./date-utils";
@@ -142,7 +144,7 @@ export class AgendaView extends ItemView {
     if (!this.plugin.settings.showRemindersInAgenda) return [];
     const lists = this.plugin.settings.agendaReminderLists;
     const day = formatDateForCli(this.currentDate);
-    const nextDay = formatDateForCli(addDays(this.currentDate, 1));
+    const nextDay = formatIsoLocal(addDays(this.currentDate, 1));
     try {
       const requested = lists.length > 0 ? lists : [undefined];
       const batches = await Promise.all(
@@ -150,12 +152,12 @@ export class AgendaView extends ItemView {
           fetchReminders(this.plugin.resolveBridgePath(), {
             list,
             incompleteOnly: true,
-            dueBefore: `${nextDay}T00:00:00Z`,
+            dueBefore: nextDay,
           })
         )
       );
       // dueBefore is an upper bound only, so drop anything before the day itself.
-      return batches.flat().filter((r) => (r.dueDate ?? "") >= day);
+      return batches.flat().filter((r) => dueDay(r.dueDate) === day);
     } catch (e) {
       // A reminders failure should not blank out the agenda.
       console.error("Failed to load reminders", e);

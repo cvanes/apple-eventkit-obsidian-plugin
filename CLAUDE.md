@@ -94,6 +94,13 @@ This keeps scripts and agents free of UUIDs.
 All-day reminders report `dueDate` as `YYYY-MM-DD` and timed ones as ISO 8601, with `isAllDay` alongside.
 Reporting a UTC instant for an all-day reminder shifts the apparent day either side of midnight.
 
+Because the two formats are mixed, `dueDate` strings must **never** be compared to each other or to a
+cutoff: `"2026-08-12"` sorts below `"2026-08-12T00:00:00Z"` because it is a prefix, so an all-day
+reminder leaks into the previous day. `--due-before` filtering and sorting compare `Date` instants
+instead (all-day reminders being local midnight), and the agenda compares local day strings via
+`dueDay`. The cutoff the agenda sends carries the local UTC offset (`+01:00` in BST), not `Z` —
+a `Z` cutoff puts the boundary an hour out and drags the next day's items onto today.
+
 Swift's synthesised `Codable` omits nil optionals, so `dueDate` and `url` may be **absent** rather than
 null. The TypeScript types mark them optional to match.
 

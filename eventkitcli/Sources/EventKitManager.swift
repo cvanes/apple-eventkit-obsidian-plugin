@@ -140,16 +140,20 @@ class EventKitManager {
                 cont.resume(returning: result ?? [])
             }
         }
-        var mapped = reminders.map { reminderInfo($0) }
-        if incompleteOnly { mapped = mapped.filter { !$0.isCompleted } }
+        var matching = reminders
+        if incompleteOnly { matching = matching.filter { !$0.isCompleted } }
         if let dueBefore {
-            let cutoff = isoFormatter.string(from: dueBefore)
-            mapped = mapped.filter { due in
-                guard let d = due.dueDate else { return false }
-                return d < cutoff
+            // Compare instants, not the formatted strings: an all-day reminder
+            // renders as "2026-08-12", which sorts *below* "2026-08-12T00:00:00Z"
+            // because it is a prefix, and so leaks into the previous day.
+            matching = matching.filter { reminder in
+                guard let due = dueInstant(reminder) else { return false }
+                return due < dueBefore
             }
         }
-        return mapped.sorted { ($0.dueDate ?? "9999") < ($1.dueDate ?? "9999") }
+        return matching
+            .sorted { (dueInstant($0) ?? .distantFuture) < (dueInstant($1) ?? .distantFuture) }
+            .map { reminderInfo($0) }
     }
 
     func getReminder(id: String) -> ReminderInfo? {
@@ -247,10 +251,17 @@ class EventKitManager {
         ReminderListInfo(id: cal.calendarIdentifier, title: cal.title, color: hexColor(cal.cgColor))
     }
 
+    /// When a reminder falls due, as an instant. All-day reminders have no time
+    /// component, so this is local midnight on the due day.
+    private func dueInstant(_ reminder: EKReminder) -> Date? {
+        guard let comps = reminder.dueDateComponents else { return nil }
+        return Calendar.current.date(from: comps)
+    }
+
     private func reminderInfo(_ reminder: EKReminder) -> ReminderInfo {
         var dueDateStr: String? = nil
         var isAllDay = false
-        if let comps = reminder.dueDateComponents, let date = Calendar.current.date(from: comps) {
+        if let comps = reminder.dueDateComponents, let date = dueInstant(reminder) {
             // No time component means an all-day reminder. Emitting a UTC instant
             // for those shifts the apparent day either side of midnight, so emit a
             // plain date instead.
