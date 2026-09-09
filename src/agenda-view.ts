@@ -1,15 +1,23 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import type AppleCalendarPlugin from "./main";
 import { BridgeEvent, BridgeReminder } from "./types";
 import { fetchEvents, fetchReminders } from "./bridge";
 import {
   createOrOpenEventNote,
+  createOrOpenReminderNote,
   syncNoteWithEvent,
-  buildEventNoteIndex,
-  noteKey,
-  eventDateString,
-  type EventNoteIndex,
+  unlinkNoteFromEvent,
+  unlinkNoteFromReminder,
 } from "./note-manager";
+import {
+  NoteIndex,
+  buildNoteIndex,
+  eventDateString,
+  findNoteForEvent,
+  findNoteForReminder,
+} from "./note-index";
+import { openDateInCalendar, openReminderInApp } from "./open-in-app";
+import { confirmDelete, confirmUnlink } from "./confirm-modal";
 import {
   formatDateForDisplay,
   formatDateForCli,
@@ -20,6 +28,7 @@ import {
 } from "./date-utils";
 import {
   AgendaCallbacks,
+  LinkedItems,
   renderHeader,
   renderAgendaList,
   renderEmptyState,
@@ -34,8 +43,8 @@ export class AgendaView extends ItemView {
   plugin: AppleCalendarPlugin;
   currentDate: Date = startOfDay(new Date());
   events: BridgeEvent[] = [];
-  private noteIndex: EventNoteIndex = new Map();
   reminders: BridgeReminder[] = [];
+  private noteIndex: NoteIndex = { events: new Map(), reminders: new Map() };
 
   constructor(leaf: WorkspaceLeaf, plugin: AppleCalendarPlugin) {
     super(leaf);
@@ -109,7 +118,7 @@ export class AgendaView extends ItemView {
     try {
       this.events = await this.loadEvents();
       this.reminders = await this.loadReminders();
-      this.noteIndex = buildEventNoteIndex(this.app);
+      this.noteIndex = buildNoteIndex(this.app);
       await this.syncLinkedNotes();
       this.renderContent(container, callbacks);
     } catch (e) {
@@ -133,7 +142,7 @@ export class AgendaView extends ItemView {
       ...this.events.map((event) => ({ kind: "event" as const, event })),
       ...this.reminders.map((reminder) => ({ kind: "reminder" as const, reminder })),
     ];
-    renderAgendaList(container, items, this.findLinkedEventIds(), callbacks);
+    renderAgendaList(container, items, this.linkedItems(), callbacks);
   }
 
   /**
@@ -192,28 +201,40 @@ export class AgendaView extends ItemView {
     }
   }
 
-  /** Event ids that already have a note, for the current day's events only. */
-  findLinkedEventIds(): Set<string> {
-    const ids = new Set<string>();
-    for (const event of this.events) {
-      const hasNote =
-        this.noteIndex.has(noteKey(event.id, eventDateString(event))) ||
-        this.noteIndex.has(event.id);
-      if (hasNote) ids.add(event.id);
-    }
-    return ids;
+  /** Which of the day's items already have a note. */
+  private linkedItems(): LinkedItems {
+    return {
+      events: new Set(
+        this.events.filter((e) => this.noteForEvent(e)).map((e) => e.id)
+      ),
+      reminders: new Set(
+        this.reminders.filter((r) => this.noteForReminder(r)).map((r) => r.id)
+      ),
+    };
+  }
+
+  private noteForEvent(event: BridgeEvent): TFile | null {
+    return findNoteForEvent(this.noteIndex, event);
+  }
+
+  private noteForReminder(reminder: BridgeReminder): TFile | null {
+    return findNoteForReminder(this.noteIndex, reminder);
   }
 
   private createCallbacks(): AgendaCallbacks {
     return {
       onPrevDay: () => this.navigateDay(-1),
       onNextDay: () => this.navigateDay(1),
-      onToday: () => this.goToToday(),
+      onToday: () => this.showToday(),
       onReload: () => this.refresh(),
       onDatePick: (date) => this.goToDate(date),
       onEventClick: (event) => this.handleEventClick(event),
-      onReminderClick: (reminder) => this.plugin.openReminderInApp(reminder),
-      onReminderOpenNote: (reminder) => this.handleReminderOpenNote(reminder),
+      onEventContextMenu: (event, mouse) => this.showEventMenu(event, mouse),
+      onReminderClick: (reminder) => this.handleReminderClick(reminder),
+      onReminderContextMenu: (reminder, mouse) => this.showReminderMenu(reminder, mouse),
+      onReminderOpenUrl: (reminder) => {
+        if (reminder.url) window.open(reminder.url);
+      },
     };
   }
 
@@ -228,22 +249,96 @@ export class AgendaView extends ItemView {
     await this.refresh();
   }
 
-  private async goToToday(): Promise<void> {
-    await this.showToday();
-  }
-
   private async goToDate(dateStr: string): Promise<void> {
     this.currentDate = startOfDay(new Date(dateStr + "T00:00:00"));
     this.renderedForToday = false;
     await this.refresh();
   }
 
-  private handleReminderOpenNote(reminder: BridgeReminder): void {
-    if (reminder.url) window.open(reminder.url);
+  private async handleEventClick(event: BridgeEvent): Promise<void> {
+    await this.runAndRefresh("Failed to create event note", () =>
+      createOrOpenEventNote(this.app, event, this.plugin.settings, this.noteIndex)
+    );
   }
 
-  private async handleEventClick(event: BridgeEvent): Promise<void> {
-    await createOrOpenEventNote(this.app, event, this.plugin.settings, this.noteIndex);
+  private async handleReminderClick(reminder: BridgeReminder): Promise<void> {
+    await this.runAndRefresh("Failed to create reminder note", () =>
+      createOrOpenReminderNote(
+        this.app,
+        reminder,
+        this.plugin.resolveBridgePath(),
+        this.noteIndex
+      )
+    );
+  }
+
+  // MARK: - Context menus
+
+  private showEventMenu(event: BridgeEvent, mouse: MouseEvent): void {
+    const menu = new Menu();
+    menu.addItem((item) =>
+      item
+        .setTitle("Open in Calendar")
+        .setIcon("calendar")
+        .onClick(() => openDateInCalendar(eventDateString(event)))
+    );
+    const note = this.noteForEvent(event);
+    if (note) {
+      this.addLinkedNoteItems(menu, note, () => unlinkNoteFromEvent(this.app, note));
+    }
+    menu.showAtMouseEvent(mouse);
+  }
+
+  private showReminderMenu(reminder: BridgeReminder, mouse: MouseEvent): void {
+    const menu = new Menu();
+    menu.addItem((item) =>
+      item
+        .setTitle("Open in Reminders")
+        .setIcon("bell")
+        .onClick(() => openReminderInApp(reminder))
+    );
+    const note = this.noteForReminder(reminder);
+    if (note) {
+      this.addLinkedNoteItems(menu, note, () =>
+        unlinkNoteFromReminder(this.app, note, this.plugin.resolveBridgePath())
+      );
+    }
+    menu.showAtMouseEvent(mouse);
+  }
+
+  /** "Unlink note" and "Delete note" for an item that already has one. */
+  private addLinkedNoteItems(menu: Menu, note: TFile, unlink: () => Promise<void>): void {
+    menu.addSeparator();
+    menu.addItem((item) =>
+      item
+        .setTitle("Unlink note")
+        .setIcon("unlink")
+        .onClick(async () => {
+          if (await confirmUnlink(this.app, note)) {
+            await this.runAndRefresh("Failed to unlink note", unlink);
+          }
+        })
+    );
+    menu.addItem((item) =>
+      item
+        .setTitle("Delete note")
+        .setIcon("trash")
+        .onClick(async () => {
+          if (!(await confirmDelete(this.app, note))) return;
+          await this.runAndRefresh("Failed to delete note", async () => {
+            await unlink();
+            await this.app.fileManager.trashFile(note);
+          });
+        })
+    );
+  }
+
+  private async runAndRefresh(failureMessage: string, action: () => Promise<void>): Promise<void> {
+    try {
+      await action();
+    } catch (e) {
+      new Notice(`${failureMessage}: ${e}`);
+    }
     await this.refresh();
   }
 }

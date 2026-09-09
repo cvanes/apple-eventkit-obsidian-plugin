@@ -183,15 +183,23 @@ class EventKitManager {
 
     func updateReminder(
         id: String, title: String?, dueDate: Date?, notes: String?,
-        priority: Int?, url: String?, clearDue: Bool
+        priority: Int?, url: String?, clearDue: Bool, clearUrl: Bool = false, clearNotes: Bool = false
     ) throws -> ReminderInfo {
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
             throw EventKitError.reminderNotFound(id)
         }
         if let title { reminder.title = title }
-        if let notes { reminder.notes = notes }
+        if clearNotes {
+            reminder.notes = nil
+        } else if let notes {
+            reminder.notes = notes
+        }
         if let priority { reminder.priority = priority }
-        if let url, let parsed = URL(string: url) { reminder.url = parsed }
+        if clearUrl {
+            reminder.url = nil
+        } else if let url, let parsed = URL(string: url) {
+            reminder.url = parsed
+        }
         if clearDue {
             reminder.dueDateComponents = nil
         } else if let dueDate {

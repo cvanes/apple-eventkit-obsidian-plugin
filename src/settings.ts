@@ -176,7 +176,7 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Show reminders in agenda")
       .setDesc(
-        "List reminders due on the selected day underneath that day's events, with a checkbox to complete them."
+        "Interleave reminders due on the selected day with that day's events. Click one to create or open its note; right-click to open it in Reminders."
       )
       .addToggle((t: any) =>
         t.setValue(this.plugin.settings.showRemindersInAgenda).onChange(async (value: boolean) => {
@@ -268,10 +268,7 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
 
     const dot = createEl("span", { cls: "apple-eventkit-dot" });
     dot.style.backgroundColor = toggle.color;
-    setting.nameEl.prepend(dot);
-    setting.nameEl.prepend(createEl("span", { text: " " }));
-    // Re-order: dot first, then space, then text
-    setting.nameEl.prepend(dot);
+    setting.nameEl.prepend(dot, " ");
   }
 
   async refreshCalendars(): Promise<void> {
@@ -302,11 +299,11 @@ export class AppleCalendarSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Bridge path")
       .setDesc(
-        "Path to eventkitcli binary. Leave empty for auto-detection."
+        "Path to the eventkitcli binary. Leave empty to use the copy bundled with the plugin."
       )
       .addText((text) =>
         text
-          .setPlaceholder("~/.local/bin/eventkitcli")
+          .setPlaceholder("/path/to/eventkitcli")
           .setValue(this.plugin.settings.bridgePath)
           .onChange(async (value) => {
             this.plugin.settings.bridgePath = value;

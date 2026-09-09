@@ -6,12 +6,14 @@ struct UpdateReminder: ParsableCommand {
         commandName: "update-reminder",
         abstract: "Update an existing reminder.",
         discussion: """
-        Only the options you pass are changed. Use --clear-due to remove a due date.
+        Only the options you pass are changed. Use --clear-due, --clear-url and
+        --clear-notes to remove the due date, attached URL and notes respectively.
 
         Examples:
           eventkitcli update-reminder --id ID --title "New title"
           eventkitcli update-reminder --id ID --due 2026-08-04T09:00:00Z --priority 1
           eventkitcli update-reminder --id ID --clear-due
+          eventkitcli update-reminder --id ID --clear-url --clear-notes
         """
     )
 
@@ -36,6 +38,12 @@ struct UpdateReminder: ParsableCommand {
     @Flag(help: "Remove the due date.")
     var clearDue: Bool = false
 
+    @Flag(help: "Remove the attached URL.")
+    var clearUrl: Bool = false
+
+    @Flag(help: "Remove the notes.")
+    var clearNotes: Bool = false
+
     func run() {
         runAsync {
             let manager = EventKitManager()
@@ -44,7 +52,8 @@ struct UpdateReminder: ParsableCommand {
                 let dueDate = due.flatMap { ISO8601DateFormatter().date(from: $0) }
                 let reminder = try manager.updateReminder(
                     id: id, title: title, dueDate: dueDate, notes: notes,
-                    priority: priority, url: url, clearDue: clearDue
+                    priority: priority, url: url,
+                    clearDue: clearDue, clearUrl: clearUrl, clearNotes: clearNotes
                 )
                 printJSON(reminder)
             } catch {

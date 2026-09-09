@@ -7,11 +7,20 @@ export interface AgendaCallbacks {
   onToday: () => void;
   onReload: () => void;
   onDatePick: (date: string) => void;
+  /** Create or open the note linked to the event. */
   onEventClick: (event: BridgeEvent) => void;
-  /** Open the reminder in Reminders.app. */
+  onEventContextMenu: (event: BridgeEvent, mouse: MouseEvent) => void;
+  /** Create or open the note linked to the reminder. */
   onReminderClick: (reminder: BridgeReminder) => void;
-  /** Open the note the reminder was created from, if it has one. */
-  onReminderOpenNote: (reminder: BridgeReminder) => void;
+  onReminderContextMenu: (reminder: BridgeReminder, mouse: MouseEvent) => void;
+  /** Open the URL a reminder carries, for reminders created from a note. */
+  onReminderOpenUrl: (reminder: BridgeReminder) => void;
+}
+
+/** Ids of the day's events and reminders that already have a linked note. */
+export interface LinkedItems {
+  events: Set<string>;
+  reminders: Set<string>;
 }
 
 export function renderHeader(
@@ -95,15 +104,15 @@ export function sortAgendaItems(items: AgendaItem[]): AgendaItem[] {
 export function renderAgendaList(
   container: HTMLElement,
   items: AgendaItem[],
-  noteEventIds: Set<string>,
+  linked: LinkedItems,
   callbacks: AgendaCallbacks
 ): void {
   const list = container.createDiv({ cls: "apple-eventkit-events" });
   for (const item of sortAgendaItems(items)) {
     if (item.kind === "event") {
-      renderEventRow(list, item.event, noteEventIds.has(item.event.id), callbacks);
+      renderEventRow(list, item.event, linked.events.has(item.event.id), callbacks);
     } else {
-      renderReminderRow(list, item.reminder, callbacks);
+      renderReminderRow(list, item.reminder, linked.reminders.has(item.reminder.id), callbacks);
     }
   }
 }
@@ -123,6 +132,7 @@ function renderEventRow(
     : "apple-eventkit-event-row";
   const row = container.createDiv({ cls });
   row.addEventListener("click", () => callbacks.onEventClick(event));
+  row.addEventListener("contextmenu", (e) => callbacks.onEventContextMenu(event, e));
 
   const dot = row.createEl("span", { cls: "apple-eventkit-dot" });
   dot.style.backgroundColor = event.calendarColor;
@@ -133,19 +143,23 @@ function renderEventRow(
     : `${formatTime(event.startDate)} - ${formatTime(event.endDate)}`;
   info.createEl("span", { text: timeStr, cls: "apple-eventkit-event-time" });
 
-  const titleCls = hasNote
+  info.createEl("span", { text: event.title, cls: titleClass(hasNote) });
+}
+
+function titleClass(hasNote: boolean): string {
+  return hasNote
     ? "apple-eventkit-event-title apple-eventkit-linked"
     : "apple-eventkit-event-title";
-  info.createEl("span", { text: event.title, cls: titleCls });
 }
 
 /**
  * Reminders render in the same shape as events -- a coloured dot from their list,
- * a time and a title -- plus a checkbox to complete them in place.
+ * a time and a title.
  */
 function renderReminderRow(
   container: HTMLElement,
   reminder: BridgeReminder,
+  hasNote: boolean,
   callbacks: AgendaCallbacks
 ): void {
   const allDay = reminderIsAllDay(reminder);
@@ -158,6 +172,7 @@ function renderReminderRow(
   });
 
   row.addEventListener("click", () => callbacks.onReminderClick(reminder));
+  row.addEventListener("contextmenu", (e) => callbacks.onReminderContextMenu(reminder, e));
 
   const dot = row.createEl("span", { cls: "apple-eventkit-dot" });
   dot.style.backgroundColor = reminder.listColor;
@@ -167,13 +182,12 @@ function renderReminderRow(
     ? `All day \u00B7 ${reminder.listTitle}`
     : `${formatTime(reminder.dueDate as string)} \u00B7 ${reminder.listTitle}`;
   info.createEl("span", { text: timeStr, cls: "apple-eventkit-event-time" });
-  info.createEl("span", {
-    text: reminder.title,
-    cls: "apple-eventkit-event-title",
-  });
+  info.createEl("span", { text: reminder.title, cls: titleClass(hasNote) });
 
-  // Reminders created from a note carry an obsidian:// link back to it.
-  if (reminder.url) {
+  // Reminders created from a selection carry an obsidian:// link back to that
+  // note without being linked to it. A linked note is reached by clicking the
+  // row, so the arrow is only offered when there is no such note.
+  if (reminder.url && !hasNote) {
     const link = row.createEl("span", {
       text: "\u2197",
       cls: "apple-eventkit-reminder-link",
@@ -181,7 +195,7 @@ function renderReminderRow(
     });
     link.addEventListener("click", (e) => {
       e.stopPropagation();
-      callbacks.onReminderOpenNote(reminder);
+      callbacks.onReminderOpenUrl(reminder);
     });
   }
 }

@@ -35,17 +35,33 @@ only touches `child_process`, `fs`, `path` and `util`, so the surface is stable 
 ## Building
 
 - **Plugin**: `npm run build` produces `main.js` in the project root.
-- **CLI**: `cd eventkitcli && bash build.sh` builds a universal binary (arm64 + x86_64), codesigns it, and copies it to the plugin directory.
+- **CLI**: `cd eventkitcli && bash build.sh` builds a universal binary (arm64 + x86_64) and codesigns it. `./install.sh` runs both builds and copies
+  everything into the vault's plugin directory.
 
 ## Key conventions
 
-- The bridge layer (`bridge.ts`) is the only file that calls `child_process`. All CLI interaction goes through it.
+- The bridge layer (`bridge.ts`) is the only file that calls `eventkitcli`. `open-in-app.ts` is the only other
+  user of `child_process`, running `osascript` to reveal a day in Calendar or a reminder in Reminders.
 - The agenda view separates data/lifecycle (`agenda-view.ts`) from DOM rendering (`agenda-renderer.ts`). Renderer functions are pure — they take a container element and data, and return nothing.
 - Deep-linking into Reminders.app needs `externalId` (`calendarItemExternalIdentifier`), **not** `id` (`calendarItemIdentifier`) — the two are different UUID spaces and Reminders only recognises the former. There is no usable URL scheme either: `x-apple-reminder://` is not registered with Launch Services, so `open` fails with `kLSApplicationNotFoundErr`. AppleScript does resolve it, so `show reminder id "x-apple-reminder://<externalId>"` via osascript is the route, matching the existing Calendar opener.
-- Events and reminders render as one interleaved list via `AgendaItem`, sorted by `sortAgendaItems`: all-day items first, then timed items by start/due time. Reminders are distinguished only by a checkbox and a list-coloured dot, matching Apple Calendar.
+- Events and reminders render as one interleaved list via `AgendaItem`, sorted by `sortAgendaItems`: all-day items first, then timed items by start/due time. Reminders are distinguished only by a list-coloured dot, matching Apple Calendar. Left-click creates or opens the linked note; right-click gives a `Menu` with open-in-app, unlink and delete.
 - Refresh triggers are the five-minute timer, `visibilitychange` and window `focus`. The timer does not fire across sleep, so the event listeners are what keep the view current. `advanceIfDayChanged` rolls the view onto the new day at midnight, but only while it is still showing today — explicit navigation sets `renderedForToday` false and is respected.
-- Event notes are linked to calendar events via `event-id` in frontmatter. Note lookup scans `app.metadataCache`.
-- Settings support moment.js date tokens in `noteFolderPath` (e.g. `YYYY/MM`). Empty path means vault root.
+- Notes link to items through frontmatter, field names in `FRONTMATTER` (`note-index.ts`): `eventkit-calendar-id`
+  + `eventkit-calendar-date` for events, `eventkit-reminder-id` for reminders. A note may carry both. Lookup
+  builds a `NoteIndex` from `app.metadataCache` once per refresh.
+- The calendar date is part of the event key because recurring occurrences share one `eventIdentifier`. It is
+  the *local* day (`formatDateForCli`), never `toISOString().slice(0, 10)`: an all-day event starts at local
+  midnight, which is the previous day in UTC during BST.
+- Linking a note to a reminder writes an Advanced URI (`obsidian://adv-uri?vault=…&uid=…`) into the reminder's
+  **notes** and `url`. The uid field name is read from the Advanced URI plugin's own settings (`advanced-uri.ts`)
+  rather than duplicated in ours. Existing reminder notes are appended to the Obsidian note *before* the reminder
+  is rewritten, and the reminder is re-fetched first rather than trusting the agenda's cached copy, so a failure
+  can duplicate but never lose them. Unlinking strips only the URI lines from the notes and clears the URL.
+- `EKReminder.url` is a dead end for visibility on the Mac. Reminders stores it as the iCalendar URL
+  (`ZICSURL` in its database) and never shows it; the link chips it displays are `ZREMCDSAVEDATTACHMENT` rows,
+  which EventKit has no public API to create. iOS does show the URL field, so it is still set.
+- `noteFolderPath` is a static parent folder (empty means vault root); date tokens belong in `dateFormat`, which can
+  contain `/` to produce dated sub-folders (e.g. `YYYY/MM/YYYY-MM-DD`).
 
 ## TCC permissions and the embedded Info.plist
 
@@ -126,6 +142,7 @@ ekc list-reminders --incomplete-only              # across all lists
 ekc list-reminders --list Work --due-before 2026-08-01T00:00:00Z
 ekc create-reminder --list Work --title "Review draft" --url "obsidian://open?vault=v&file=Note"
 ekc update-reminder --id ID --clear-due
+ekc update-reminder --id ID --clear-url --clear-notes
 echo '[{"list":"Work","title":"Batch one"}]' | ekc create-reminders   # single commit
 ekc --help
 ```

@@ -1,14 +1,23 @@
-import { Editor, Notice, Plugin } from "obsidian";
+import { Editor, Notice, Plugin, TFile } from "obsidian";
 import { chmodSync } from "fs";
-import { execFile } from "child_process";
 import { join } from "path";
-import { BridgeEvent, DEFAULT_SETTINGS, PluginSettings, BridgeReminder } from "./types";
+import { BridgeEvent, BridgeReminder, DEFAULT_SETTINGS, PluginSettings } from "./types";
 import { AppleCalendarSettingTab } from "./settings";
 import { AgendaView, VIEW_TYPE_AGENDA } from "./agenda-view";
-import { fetchEvents } from "./bridge";
+import { confirmUnlink } from "./confirm-modal";
+import { fetchEvents, fetchReminder, fetchReminders } from "./bridge";
 import { formatDateForCli, addDays, startOfDay } from "./date-utils";
-import { createOrOpenEventNote, linkNoteToEvent, unlinkNoteFromEvent } from "./note-manager";
-import { EventPickerModal } from "./event-picker-modal";
+import {
+  createOrOpenEventNote,
+  createOrOpenReminderNote,
+  linkNoteToEvent,
+  linkNoteToReminder,
+  unlinkNoteFromEvent,
+  unlinkNoteFromReminder,
+} from "./note-manager";
+import { calendarLinkOf, reminderIdOf } from "./note-index";
+import { openDateInCalendar, openReminderInApp } from "./open-in-app";
+import { pickEvent, pickReminder } from "./picker-modal";
 import { CreateReminderModal } from "./create-reminder-modal";
 
 export default class AppleCalendarPlugin extends Plugin {
@@ -59,32 +68,84 @@ export default class AppleCalendarPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "reload-calendars",
+      name: "Reload calendars",
+      callback: () => this.reloadCalendars(),
+    });
+
+    this.registerEventCommands();
+    this.registerReminderCommands();
+  }
+
+  private registerEventCommands(): void {
+    this.addCommand({
       id: "create-note-for-event",
-      name: "Create/Open note for event",
+      name: "Create/Open note for calendar event",
       callback: () => this.pickEventAndCreateNote(),
     });
 
     this.addCommand({
       id: "link-note-to-event",
       name: "Link note to calendar event",
-      checkCallback: (checking) => {
-        if (!this.app.workspace.getActiveFile()) return false;
-        if (!checking) this.pickEventAndLinkNote();
-        return true;
-      },
+      checkCallback: this.withActiveFile((file) => this.pickEventAndLinkNote(file)),
     });
 
     this.addCommand({
       id: "unlink-note-from-event",
       name: "Unlink note from calendar event",
-      checkCallback: (checking) => {
-        const file = this.app.workspace.getActiveFile();
-        if (!file) return false;
-        const cache = this.app.metadataCache.getFileCache(file);
-        if (!cache?.frontmatter?.["event-id"]) return false;
-        if (!checking) unlinkNoteFromEvent(this.app);
-        return true;
-      },
+      checkCallback: this.withLinkedFile(
+        (file) => calendarLinkOf(this.app, file) !== null,
+        async (file) => {
+          if (!(await confirmUnlink(this.app, file))) return;
+          await unlinkNoteFromEvent(this.app, file);
+          new Notice("Unlinked from calendar event.");
+        }
+      ),
+    });
+
+    this.addCommand({
+      id: "open-event-in-calendar",
+      name: "Open calendar event in Calendar",
+      checkCallback: this.withLinkedFile(
+        (file) => calendarLinkOf(this.app, file) !== null,
+        (file) => openDateInCalendar(calendarLinkOf(this.app, file)!.date)
+      ),
+    });
+  }
+
+  private registerReminderCommands(): void {
+    this.addCommand({
+      id: "create-note-for-reminder",
+      name: "Create/Open note for reminder",
+      callback: () => this.pickReminderAndCreateNote(),
+    });
+
+    this.addCommand({
+      id: "link-note-to-reminder",
+      name: "Link note to reminder",
+      checkCallback: this.withActiveFile((file) => this.pickReminderAndLinkNote(file)),
+    });
+
+    this.addCommand({
+      id: "unlink-note-from-reminder",
+      name: "Unlink note from reminder",
+      checkCallback: this.withLinkedFile(
+        (file) => reminderIdOf(this.app, file) !== null,
+        async (file) => {
+          if (!(await confirmUnlink(this.app, file))) return;
+          await unlinkNoteFromReminder(this.app, file, this.resolveBridgePath());
+          new Notice("Unlinked from reminder.");
+        }
+      ),
+    });
+
+    this.addCommand({
+      id: "open-reminder-in-reminders",
+      name: "Open reminder in Reminders",
+      checkCallback: this.withLinkedFile(
+        (file) => reminderIdOf(this.app, file) !== null,
+        (file) => this.openLinkedReminder(file)
+      ),
     });
 
     this.addCommand({
@@ -94,24 +155,24 @@ export default class AppleCalendarPlugin extends Plugin {
         this.createReminderFromSelection(editor);
       },
     });
-
-    this.addCommand({
-      id: "open-event-in-calendar",
-      name: "Open event in Calendar",
-      checkCallback: (checking) => {
-        const date = this.getActiveEventDate();
-        if (!date) return false;
-        if (!checking) this.openDateInCalendar(date);
-        return true;
-      },
-    });
-
-    this.addCommand({
-      id: "reload-calendars",
-      name: "Reload calendars",
-      callback: () => this.reloadCalendars(),
-    });
   }
+
+  /** A checkCallback that is available whenever a note is active. */
+  private withActiveFile(action: (file: TFile) => void) {
+    return this.withLinkedFile(() => true, action);
+  }
+
+  /** A checkCallback that is available when the active note satisfies `isLinked`. */
+  private withLinkedFile(isLinked: (file: TFile) => boolean, action: (file: TFile) => void) {
+    return (checking: boolean): boolean => {
+      const file = this.app.workspace.getActiveFile();
+      if (!file || !isLinked(file)) return false;
+      if (!checking) action(file);
+      return true;
+    };
+  }
+
+  // MARK: - Calendar events
 
   private async fetchUpcomingEvents(): Promise<BridgeEvent[]> {
     const now = new Date();
@@ -126,25 +187,80 @@ export default class AppleCalendarPlugin extends Plugin {
   }
 
   private async pickEventAndCreateNote(): Promise<void> {
-    try {
-      const events = await this.fetchUpcomingEvents();
-      new EventPickerModal(this.app, events, (event) => {
+    await this.withEvents((events) =>
+      pickEvent(this.app, events, (event) => {
         createOrOpenEventNote(this.app, event, this.settings);
-      }).open();
+      })
+    );
+  }
+
+  private async pickEventAndLinkNote(file: TFile): Promise<void> {
+    await this.withEvents((events) =>
+      pickEvent(this.app, events, async (event) => {
+        await linkNoteToEvent(this.app, file, event);
+        new Notice(`Linked to: ${event.title}`);
+      }, "Pick an event to link to this note...")
+    );
+  }
+
+  private async withEvents(action: (events: BridgeEvent[]) => void): Promise<void> {
+    try {
+      action(await this.fetchUpcomingEvents());
     } catch (e) {
       new Notice(`Failed to load events: ${e}`);
     }
   }
 
-  private async pickEventAndLinkNote(): Promise<void> {
+  // MARK: - Reminders
+
+  private fetchOpenReminders(): Promise<BridgeReminder[]> {
+    return fetchReminders(this.resolveBridgePath(), { incompleteOnly: true });
+  }
+
+  private async pickReminderAndCreateNote(): Promise<void> {
+    await this.withReminders((reminders) =>
+      pickReminder(this.app, reminders, (reminder) => {
+        this.tryReminderAction("Failed to create reminder note", () =>
+          createOrOpenReminderNote(this.app, reminder, this.resolveBridgePath())
+        );
+      })
+    );
+  }
+
+  private async pickReminderAndLinkNote(file: TFile): Promise<void> {
+    await this.withReminders((reminders) =>
+      pickReminder(this.app, reminders, (reminder) => {
+        this.tryReminderAction("Failed to link reminder", async () => {
+          await linkNoteToReminder(this.app, file, reminder, this.resolveBridgePath());
+          new Notice(`Linked to: ${reminder.title}`);
+        });
+      }, "Pick a reminder to link to this note...")
+    );
+  }
+
+  private async withReminders(action: (reminders: BridgeReminder[]) => void): Promise<void> {
     try {
-      const events = await this.fetchUpcomingEvents();
-      new EventPickerModal(this.app, events, (event) => {
-        linkNoteToEvent(this.app, event);
-      }, "Pick an event to link to this note...").open();
+      action(await this.fetchOpenReminders());
     } catch (e) {
-      new Notice(`Failed to load events: ${e}`);
+      new Notice(`Failed to load reminders: ${e}`);
     }
+  }
+
+  private async tryReminderAction(failureMessage: string, action: () => Promise<void>): Promise<void> {
+    try {
+      await action();
+    } catch (e) {
+      new Notice(`${failureMessage}: ${e}`);
+    }
+  }
+
+  /** Reminders.app needs the external id, which the note does not hold, so look it up. */
+  private async openLinkedReminder(file: TFile): Promise<void> {
+    const id = reminderIdOf(this.app, file);
+    if (!id) return;
+    await this.tryReminderAction("Failed to open reminder", async () => {
+      openReminderInApp(await fetchReminder(this.resolveBridgePath(), id));
+    });
   }
 
   private createReminderFromSelection(editor: Editor): void {
@@ -176,6 +292,8 @@ export default class AppleCalendarPlugin extends Plugin {
     return `obsidian://open?vault=${vault}&file=${path}`;
   }
 
+  // MARK: - Agenda view
+
   /** Re-render every open agenda leaf, e.g. after a settings change. */
   async refreshAgendaViews(): Promise<void> {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_AGENDA)) {
@@ -186,64 +304,8 @@ export default class AppleCalendarPlugin extends Plugin {
   private async reloadCalendars(): Promise<void> {
     const settingTab = new AppleCalendarSettingTab(this.app, this);
     await settingTab.refreshCalendars();
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AGENDA);
-    for (const leaf of leaves) {
-      if (leaf.view instanceof AgendaView) {
-        await leaf.view.refresh();
-      }
-    }
+    await this.refreshAgendaViews();
     new Notice("Calendars reloaded.");
-  }
-
-  private getActiveEventDate(): string | null {
-    const file = this.app.workspace.getActiveFile();
-    if (!file) return null;
-    const cache = this.app.metadataCache.getFileCache(file);
-    return cache?.frontmatter?.["event-date"] ?? null;
-  }
-
-  /**
-   * Reveal a reminder in Reminders.app.
-   *
-   * There is no usable URL scheme: `x-apple-reminder://` is not registered with
-   * Launch Services, so `open` fails with kLSApplicationNotFoundErr. AppleScript
-   * does resolve that identifier though, so `show reminder id` is the route --
-   * the same osascript approach already used for Calendar.
-   *
-   * It must be the *external* identifier: Reminders does not recognise
-   * EventKit's calendarItemIdentifier.
-   */
-  openReminderInApp(reminder: BridgeReminder): void {
-    if (!reminder.externalId) {
-      new Notice("This reminder cannot be opened in Reminders.");
-      return;
-    }
-    const script = [
-      'tell application "Reminders"',
-      "activate",
-      `show reminder id "x-apple-reminder://${reminder.externalId}"`,
-      "end tell",
-    ].join("\n");
-    execFile("osascript", ["-e", script], (err) => {
-      if (err) new Notice(`Failed to open Reminders: ${err.message}`);
-    });
-  }
-
-  private openDateInCalendar(dateStr: string): void {
-    const d = new Date(dateStr + "T00:00:00");
-    const script = [
-      "tell application \"Calendar\"",
-      "activate",
-      "set d to current date",
-      `set year of d to ${d.getFullYear()}`,
-      `set month of d to ${d.getMonth() + 1}`,
-      `set day of d to ${d.getDate()}`,
-      "view calendar at d",
-      "end tell",
-    ].join("\n");
-    execFile("osascript", ["-e", script], (err) => {
-      if (err) new Notice(`Failed to open Calendar: ${err.message}`);
-    });
   }
 
   async activateAgendaViewToday(): Promise<void> {
@@ -265,6 +327,8 @@ export default class AppleCalendarPlugin extends Plugin {
     await leaf.setViewState({ type: VIEW_TYPE_AGENDA, active: true });
     this.app.workspace.revealLeaf(leaf);
   }
+
+  // MARK: - Bridge
 
   resolveBridgePath(): string {
     if (this.settings.bridgePath) return this.settings.bridgePath;

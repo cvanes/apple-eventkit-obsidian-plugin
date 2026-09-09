@@ -99,8 +99,9 @@ export class CreateReminderModal extends Modal {
       new Notice("Please select a reminder list.");
       return;
     }
+    const dueIso = this.parseDueDate();
+    if (dueIso === null) return;
     try {
-      const dueIso = this.parseDueDate();
       const reminder = await createReminder(
         this.bridgePath,
         this.selectedListId,
@@ -114,12 +115,13 @@ export class CreateReminderModal extends Modal {
     }
   }
 
-  private parseDueDate(): string | undefined {
+  /** Undefined when no date was given; null when one was given but not understood. */
+  private parseDueDate(): string | undefined | null {
     if (!this.dueDateInput.trim()) return undefined;
     const parsed = chrono.parseDate(this.dueDateInput);
     if (!parsed) {
       new Notice(`Could not parse date: "${this.dueDateInput}"`);
-      return undefined;
+      return null;
     }
     return parsed.toISOString().replace(/\.\d{3}Z$/, "Z");
   }

@@ -47,12 +47,6 @@ export function fetchEvents(
   return run(bridgePath, args);
 }
 
-export function fetchEvent(
-  bridgePath: string,
-  id: string
-): Promise<BridgeEvent> {
-  return run(bridgePath, ["get-event", `--id=${id}`]);
-}
 
 export interface CreateReminderOptions {
   dueDate?: string;
@@ -90,16 +84,30 @@ export function fetchReminders(
   return run(bridgePath, args);
 }
 
-export function completeReminder(
+export function fetchReminder(
   bridgePath: string,
   id: string
 ): Promise<BridgeReminder> {
-  return run(bridgePath, ["complete-reminder", `--id=${id}`]);
+  return run(bridgePath, ["get-reminder", `--id=${id}`]);
 }
 
-export function createReminderList(
+export interface UpdateReminderOptions {
+  url?: string;
+  notes?: string;
+  clearUrl?: boolean;
+  clearNotes?: boolean;
+}
+
+/** Only the fields passed are changed. */
+export function updateReminder(
   bridgePath: string,
-  title: string
-): Promise<BridgeReminderList> {
-  return run(bridgePath, ["create-reminder-list", `--title=${title}`]);
+  id: string,
+  options: UpdateReminderOptions
+): Promise<BridgeReminder> {
+  const args = ["update-reminder", `--id=${id}`];
+  if (options.url !== undefined) args.push(`--url=${options.url}`);
+  if (options.notes !== undefined) args.push(`--notes=${options.notes}`);
+  if (options.clearUrl) args.push("--clear-url");
+  if (options.clearNotes) args.push("--clear-notes");
+  return run(bridgePath, args);
 }
